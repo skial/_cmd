@@ -1,0 +1,3 @@
+-cp src
+-neko bin/cmd.n
+-main Main

@@ -1,0 +1,14 @@
+{
+  "name": "cmd",
+  "license": "MIT",
+  "classPath": "src",
+  "tags": ["uhu", "uhx", "sys", "cmd", "command", "line", "macro", "help"],
+  "description": "A set of helper classes to build command line tools.",
+  "contributors": ["skial"],
+  "releasenote": "Initial Release",
+  "version": "0.0.1-alpha",
+  "url": "https://github.com/skial/cmd",
+  "dependencies": {
+    "klas": ""
+  }
+}
