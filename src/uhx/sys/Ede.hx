@@ -36,6 +36,8 @@ class Ede {
 	}
 
 	public static function handler(cls:ClassType, fields:Array<Field>):Array<Field> {
+		if (Context.defined( 'display' )) return fields;
+		
 		if (!fields.exists( 'new' )) {
 			throw 'Only class instances are supported';
 		}
