@@ -164,7 +164,7 @@ class Ede {
 					
 					for (param in cls.meta.get().get(':usage').params) {
 						
-						docs.push( '\t' + param.printExpr().replace('"', '') + '\n' );
+						docs.push( '\t' + param.printExpr().replace('"', '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
 						
 					}
 					
@@ -242,7 +242,7 @@ class Ede {
 				
 			case _:
 		}
-		trace( [for (f in fields) f.printField()].join('\n') );
+		
 		return fields;
 	}
 	
