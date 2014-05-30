@@ -1,5 +1,6 @@
 package uhx.sys;
 
+import haxe.macro.Printer;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import uhx.macro.KlasImp;
@@ -19,10 +20,7 @@ class Ede {
 	
 	public static macro function initialize():Void {
 		try {
-			if (!KlasImp.setup) {
-				KlasImp.initalize();
-			}
-			
+			KlasImp.initalize();
 			KlasImp.CLASS_META.set(':cmd', Ede.handler);
 		} catch (e:Dynamic) {
 			// This assumes that `implements Klas` is not being used
@@ -42,14 +40,14 @@ class Ede {
 			throw 'Only class instances are supported';
 		}
 		
+		// Force the compiler to include javadoc during macro mode.
+		//Compiler.define( 'use-rtti-doc' ); // This doesnt work...
+		
 		var _new = fields.get( 'new' );
 		
 		if (!_new.args().exists( 'args' ))  {
 			Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
 		}
-		
-		// Force the compiler to include javadoc during macro mode.
-		Compiler.define( 'use_rtti_doc' );
 		
 		// Build a lists of instance field names.
 		var instances:Array<Expr> = [];
@@ -145,26 +143,24 @@ class Ede {
 		var docs:Array<String> = [];
 		
 		for (check in checks) {
+			var part = '';
+			/*if (check.doc == null) check.doc = '';
 			
-			if (check.doc == null) check.doc = '';
-			
-			var part = check.doc.replace( '\n', '' ).trim();
+			var part = check.doc.replace( '\n', '' ).replace('\t', '').replace('*', '').trim();
 			
 			if (part == '') {
 				if (checks[0] == check) {
 					part = check.name;
 				}
-			}
+			}*/
 			
-			if (part.startsWith( '*' ) ) part = part.substr( 1 ).trim();
+			//if (part.startsWith( '*' ) ) part = part.substr( 1 ).trim();
 			
 			if (checks[0] == check) {
 				
-				docs.push( part + '\n' );
-				
 				if (cls.meta.has(':usage')) {
 					
-					docs.push( '\nUsage:\n' );
+					docs.push( 'Usage:\n' );
 					
 					for (param in cls.meta.get().get(':usage').params) {
 						
@@ -188,14 +184,39 @@ class Ede {
 					
 				}
 				
-				docs.push( '\t$part' + '\n' );
+				var desc = check.doc.replace('\n', '').replace('\r', '').replace('\t', '').replace('*', '').replace('  ', ' ').trim();
+				var counter = 0, length = 0;
+				
+				while (length < desc.length) {
+					if (counter == 66) {
+						counter = 0;
+						var index = 66;
+						if (desc.charCodeAt( index ) != ' '.code) {
+							// rewind until we find a space.
+							while (true) {
+								index--;
+								if (desc.charCodeAt( index ) == ' '.code) break;
+							}
+						}
+						desc = desc.substring(0, index) + '\n\t' + desc.substring(index+1, desc.length);
+					}
+					counter++;
+					length++;
+					
+				}
+				
+				docs.push( '\t$part' + '\n' + (desc != null && desc != '' ? '\t$desc\n\n' : '') );
 				
 			}
 			
 		}
 		
 		fields.get( 'help' ).body( macro {
-			return $v { docs.join( '' ) };
+			#if sys
+			Sys.print( $v { docs.join( '' ) } );
+			#else 
+			trace( $v { docs.joing( '' ) } );
+			#end
 		} );
 		
 		var nexprs:Array<Expr> = [];
@@ -221,12 +242,12 @@ class Ede {
 				
 			case _:
 		}
-		
+		trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
 	}
 	
 	private static function valueCast(type:String):Expr {
-		var result = macro null;
+		var result = macro v;
 		
 		switch ( type ) {
 			case 'Int':

@@ -98,7 +98,7 @@ class Lod {
 					arg = arg.replace( '-', '' );
 					pre = Option( true, arg);
 					
-				} else {
+				} else if (pre != null) {
 					
 					switch (pre) {
 						case Option(_, n):
@@ -106,9 +106,16 @@ class Lod {
 							
 						case Value:
 							set( 'unmatched', [arg] );
+							
 					}
 					
 					//pre = Value;
+					
+				} else {
+					
+					// Just dump it in `argv`
+					var values = (result.exists( 'argv' ) ? result.get( 'argv' ) : []).concat( [arg] );
+					set( 'argv', values );
 					
 				}
 				
