@@ -56,9 +56,9 @@ class Liy {
 			// collect all possible values from each name
 			var values = [];
 			
-			for (name in names) {
+			for (name in names) if (args.exists( name )) {
 				
-				if (args.exists( name )) values = values.concat( args.get( name ) );
+				values = values.concat( args.get( name ) );
 				
 			}
 			

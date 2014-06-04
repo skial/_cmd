@@ -144,9 +144,9 @@ class Ede {
 		
 		for (check in checks) {
 			var part = '';
-			/*if (check.doc == null) check.doc = '';
+			if (check.doc == null) check.doc = '';
 			
-			var part = check.doc.replace( '\n', '' ).replace('\t', '').replace('*', '').trim();
+			/*var part = check.doc.replace( '\n', '' ).replace('\t', '').replace('*', '').trim();
 			
 			if (part == '') {
 				if (checks[0] == check) {
@@ -211,13 +211,8 @@ class Ede {
 			
 		}
 		
-		fields.get( 'help' ).body( macro {
-			#if sys
-			Sys.print( $v { docs.join( '' ) } );
-			#else 
-			trace( $v { docs.joing( '' ) } );
-			#end
-		} );
+		var expr = Context.defined('sys') ? macro Sys.print( $v { docs.join( '' ) } ) : macro trace( $v { docs.join( '' ) } );
+		fields.get( 'help' ).body( macro { $expr; } );
 		
 		var nexprs:Array<Expr> = [];
 		
@@ -242,7 +237,7 @@ class Ede {
 				
 			case _:
 		}
-		
+		trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
 	}
 	
@@ -255,6 +250,9 @@ class Ede {
 				
 			case 'Float':
 				result = macro Std.parseFloat( v );
+				
+			case 'Bool':
+				result = macro if ((v = v.toLowerCase()) == 'true') true else if (v == 'false') false else true;
 				
 			case 'String':
 				result = macro v;
