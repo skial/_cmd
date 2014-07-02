@@ -40,9 +40,6 @@ class Ede {
 			throw 'Only class instances are supported';
 		}
 		
-		// Force the compiler to include javadoc during macro mode.
-		//Compiler.define( 'use-rtti-doc' ); // This doesnt work...
-		
 		var _new = fields.get( 'new' );
 		
 		if (!_new.args().exists( 'args' ))  {
@@ -51,6 +48,7 @@ class Ede {
 		
 		// Build a lists of instance field names.
 		var instances:Array<Expr> = [];
+		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
 		
 		for (field in fields) if (!field.access.has( APrivate )) {
@@ -64,27 +62,34 @@ class Ede {
 					var tname = t.toType().getName();
 					
 					if (tname != 'String') {
-						var e = valueCast( tname );
-						
 						var aliases = [macro $v { field.name } ]
 							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
+						
+						var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
+						
+						var access = if (isArray) {
+							macro var v:Array<String> = cast _map.get( name );
+						} else {
+							macro var v:String = cast _map.get( name )[0];
+						}
+						
+						var e = Jete.coerce(t, macro v);
 						
 						typecasts.push( 
 							macro for (name in [$a { aliases } ]) {
 								if (_map.exists( name )) { 
-									var v:Dynamic = _map.get( name )[0];
-									_map.set(name, [$e]);
+									$access;
+									$p{['this', field.name]} = $e;
+									break;
 								}
 							} 
 						);
 					}
 					
-				case FFun(_):
-					if (field.arity() > 0 && field.name != 'new') {
+				case FFun(m):
+					if (m.args.length > 0 && field.name != 'new') {
 						
-						var arity = 'arity'.mkMeta();
-						arity.params.push( macro $v { field.arity() } );
-						field.addMeta( arity );
+						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
 						
 						var aliases = [macro $v { field.name } ]
 							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
@@ -96,8 +101,8 @@ class Ede {
 							
 							if (tname != 'String') {
 								
-								argcasts.push( macro var v:Dynamic = _args[$v { i } ] );
-								argcasts.push( macro v = $e{valueCast( tname )} );
+								argcasts.push( macro var v = _args[$v { i } ] );
+								argcasts.push( macro v = $e{Jete.coerce( field.args()[i].type, macro v )} );
 								
 							}
 						}
@@ -216,18 +221,32 @@ class Ede {
 		
 		var nexprs:Array<Expr> = [];
 		
+		
+		// If the `:usage` metadata exists on the class and it has haxelib
+		// in the string value, assume its a haxelib run module and remove
+		// the last arg which is the directory the command was called from.
+		var haxelib = if (cls.meta.has(':usage') && cls.meta.get().get(':usage').params.printExprs('').indexOf('haxelib') > -1) {
+			macro _argCopy.pop();
+		} else {
+			macro null;
+		}
+		
+		// Turn all the expressions in `typecasts` into a block of code.
+		var block = macro @:mergeBlock $b { typecasts };
+		
 		// Expressions to be put before everything else already in the constructor.
-		//nexprs.push( macro if (args.length == 0) Sys.print( help() ) );
-		nexprs.push( macro var _cmd:uhx.sys.Lod = new uhx.sys.Lod() );
-		nexprs.push( macro _cmd.args = args );
-		nexprs.push( macro var _map = _cmd.parse() );
-		nexprs = nexprs.concat( typecasts );
-		nexprs.push( macro var _line:uhx.sys.Liy = new uhx.sys.Liy() );
-		nexprs.push( macro _line.obj = this );
-		nexprs.push( macro _line.fields = [$a { instances } ] );
-		nexprs.push( macro _line.meta = haxe.rtti.Meta.getFields( $i { cls.name } ) );
-		nexprs.push( macro _line.args = _map );
-		nexprs.push( macro _line.parse() );
+		nexprs.push( macro @:mergeBlock {
+			var _argCopy = args.copy();
+			$haxelib;
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+			var _map = _cmd.parse();
+			$block;
+			/*var _line:uhx.sys.Liy = new uhx.sys.Liy(
+				this, [$a { instances } ], _map,
+				haxe.rtti.Meta.getFields( $i { cls.name } )
+			);
+			_line.parse();*/
+		} );
 		
 		var method = _new.getMethod();
 		
@@ -239,26 +258,6 @@ class Ede {
 		}
 		trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
-	}
-	
-	private static function valueCast(type:String):Expr {
-		var result = macro v;
-		
-		switch ( type ) {
-			case 'Int':
-				result = macro Std.parseInt( v );
-				
-			case 'Float':
-				result = macro Std.parseFloat( v );
-				
-			case 'Bool':
-				result = macro if ((v = v.toLowerCase()) == 'true') true else if (v == 'false') false else true;
-				
-			case 'String':
-				result = macro v;
-		}
-		
-		return result;
 	}
 	
 }
