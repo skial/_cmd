@@ -61,21 +61,21 @@ class Ede {
 				case FVar(t, _), FProp(_, _, t, _):
 					var tname = t.toType().getName();
 					
-					if (tname != 'String') {
-						var aliases = [macro $v { field.name } ]
-							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
-						
-						var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
-						
-						var access = if (isArray) {
-							macro var v:Array<String> = cast _map.get( name );
-						} else {
-							macro var v:String = cast _map.get( name )[0];
-						}
-						
-						var e = Jete.coerce(t, macro v);
-						
-						typecasts.push( 
+					var aliases = [macro $v { field.name } ]
+						.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
+					
+					var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
+					
+					var access = if (isArray) {
+						macro var v:Array<String> = cast _map.get( name );
+					} else {
+						macro var v:String = cast _map.get( $v { field.name } )[0];
+					}
+					
+					var e = Jete.coerce(t, macro v);
+					
+					typecasts.push( 
+						aliases.length > 1 ?
 							macro for (name in [$a { aliases } ]) {
 								if (_map.exists( name )) { 
 									$access;
@@ -83,8 +83,11 @@ class Ede {
 									break;
 								}
 							} 
-						);
-					}
+						: macro if (_map.exists( $v { field.name } )) {
+							$access;
+							$p{['this', field.name]} = $e;
+						}
+					);
 					
 				case FFun(m):
 					if (m.args.length > 0 && field.name != 'new') {
@@ -92,19 +95,21 @@ class Ede {
 						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
 						
 						var aliases = [macro $v { field.name } ]
-							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
+							.concat( 
+								field.meta
+									.filter( function(m) return m.name == 'alias' )
+									.map( function(m) return m.params[0] ) 
+							);
 						
 						var argcasts:Array<Expr> = [];
 						
-						for (i in 0...field.arity()) {
-							var tname = field.args()[i].type.toType().getName();
+						for (i in 0...m.args.length) {
 							
-							if (tname != 'String') {
-								
-								argcasts.push( macro var v = _args[$v { i } ] );
-								argcasts.push( macro v = $e{Jete.coerce( field.args()[i].type, macro v )} );
-								
-							}
+							argcasts.push( macro @:mergeBlock {
+								var v = _args[$v { i } ];
+								v = $e { Jete.coerce( m.args[i].type, macro v ) };
+							} );
+							
 						}
 						
 						typecasts.push(
@@ -113,8 +118,8 @@ class Ede {
 									
 									var _args = _map.get( name );
 									
-									if (_args.length < $v { field.arity() } ) {
-										throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + field.arity() + ' args.' };
+									if (_args.length < $v { m.args.length } ) {
+										throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + m.args.length + ' args.' };
 									} else {
 										$a{argcasts};
 									}
