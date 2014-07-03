@@ -18,14 +18,14 @@ class Lod {
 	private var pre:PrevLod;
 	private var result:StringMap<Array<Dynamic>>;
 	
-	public function new() {
-		
+	public function new(args:Array<String>) {
+		this.args = args;
+		this.result = new StringMap<Array<Dynamic>>();
 	}
 	
-	public function parse() {
+	public function parse():StringMap<Array<Dynamic>> {
 		if (args == null) throw 'args can not be null';
 		
-		result = new StringMap<Array<Dynamic>>();
 		set( 'original', args );
 		
 		return process( prepare( args ) );
@@ -91,12 +91,14 @@ class Lod {
 					// Option eg `--foo`
 					arg = arg.replace( '-', '' );
 					pre = Option( false, arg );
+					set( arg, [] );
 					
 				} else if (arg.startsWith( '-' )) {
 					
 					// Short hand option eg `-f`
 					arg = arg.replace( '-', '' );
 					pre = Option( true, arg);
+					set( arg, [] );
 					
 				} else if (pre != null) {
 					

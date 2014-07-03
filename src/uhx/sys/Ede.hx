@@ -40,87 +40,10 @@ class Ede {
 			throw 'Only class instances are supported';
 		}
 		
-		// Force the compiler to include javadoc during macro mode.
-		//Compiler.define( 'use-rtti-doc' ); // This doesnt work...
-		
 		var _new = fields.get( 'new' );
 		
 		if (!_new.args().exists( 'args' ))  {
 			Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
-		}
-		
-		// Build a lists of instance field names.
-		var instances:Array<Expr> = [];
-		var typecasts:Array<Expr> = [];
-		
-		for (field in fields) if (!field.access.has( APrivate )) {
-			
-			if (!field.access.has( AStatic ) && field.name != 'new') {
-				instances.push( macro $v { field.name } );
-			}
-			
-			switch (field.kind) {
-				case FVar(t, _), FProp(_, _, t, _):
-					var tname = t.toType().getName();
-					
-					if (tname != 'String') {
-						var e = valueCast( tname );
-						
-						var aliases = [macro $v { field.name } ]
-							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
-						
-						typecasts.push( 
-							macro for (name in [$a { aliases } ]) {
-								if (_map.exists( name )) { 
-									var v:Dynamic = _map.get( name )[0];
-									_map.set(name, [$e]);
-								}
-							} 
-						);
-					}
-					
-				case FFun(_):
-					if (field.arity() > 0 && field.name != 'new') {
-						
-						var arity = 'arity'.mkMeta();
-						arity.params.push( macro $v { field.arity() } );
-						field.addMeta( arity );
-						
-						var aliases = [macro $v { field.name } ]
-							.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
-						
-						var argcasts:Array<Expr> = [];
-						
-						for (i in 0...field.arity()) {
-							var tname = field.args()[i].type.toType().getName();
-							
-							if (tname != 'String') {
-								
-								argcasts.push( macro var v:Dynamic = _args[$v { i } ] );
-								argcasts.push( macro v = $e{valueCast( tname )} );
-								
-							}
-						}
-						
-						typecasts.push(
-							macro for (name in [$a { aliases } ]) {
-								if (_map.exists( name )) {
-									
-									var _args = _map.get( name );
-									
-									if (_args.length < $v { field.arity() } ) {
-										throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + field.arity() + ' args.' };
-									} else {
-										$a{argcasts};
-									}
-									
-								}
-							}
-						);
-						
-					}
-			}
-			
 		}
 		
 		// Add commandline methods if they dont exist.
@@ -130,7 +53,94 @@ class Ede {
 			.addMeta( { name: 'alias', params: [ macro 'h' ], pos: Context.currentPos() } )
 		);
 		
-		instances.push( macro 'help' );
+		// An array of expressions which cast the argument to the fields type.
+		var typecasts:Array<Expr> = [];
+		
+		for (field in fields) if (!field.access.has( APrivate )) {
+			
+			switch (field.kind) {
+				case FVar(t, _), FProp(_, _, t, _):
+					var tname = t.toType().getName();
+					
+					var aliases = [macro $v { field.name } ]
+						.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
+					
+					var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
+					
+					var access = if (isArray) {
+						macro var v:Array<String> = cast _map.get( name );
+					} else {
+						macro var v:String = cast _map.get( name )[0];
+					}
+					
+					var e = Jete.coerce(t, macro v);
+					
+					typecasts.push( 
+						aliases.length > 1 ?
+							macro for (name in [$a { aliases } ]) {
+								if (_map.exists( name )) { 
+									$access;
+									$p{['this', field.name]} = $e;
+									break;
+								}
+							} 
+						: macro if (_map.exists( $v { field.name } )) {
+							$access;
+							$p{['this', field.name]} = $e;
+						}
+					);
+					
+				case FFun(m):
+					
+					if (field.name != 'new' && field.access.indexOf( AStatic ) == -1) {
+						
+						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
+						
+						var aliases = [macro $v { field.name } ]
+						.concat( 
+							field.meta
+							.filter( function(m) return m.name == 'alias' )
+							.map( function(m) return m.params[0] ) 
+						);
+						
+						var argcasts:Array<Expr> = [];
+						
+						for (i in 0...m.args.length) {
+							argcasts.push( macro $e { Jete.coerce( m.args[i].type, macro _args[$v { i } ] ) } );
+						}
+						
+						var block = if (m.args.length > 0) {
+							macro {
+								var _args = _map.get( name );
+								
+								if (_args.length < $v { m.args.length } ) {
+									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' args.' };
+									
+								} else {
+									var _args = _map.get( name );
+									$p { ['this', field.name] } ($a { argcasts } );
+									
+								}
+							}
+							
+						} else {
+							macro {
+								$p { ['this', field.name] } ();
+								break;
+							}
+							
+						}
+						
+						typecasts.push(
+							macro for (name in [$a { aliases } ]) {
+								if (_map.exists( name )) $block;
+							}
+						);
+						
+					}
+			}
+			
+		}
 		
 		// Get all doc info.
 		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [ 
@@ -145,16 +155,6 @@ class Ede {
 		for (check in checks) {
 			var part = '';
 			if (check.doc == null) check.doc = '';
-			
-			/*var part = check.doc.replace( '\n', '' ).replace('\t', '').replace('*', '').trim();
-			
-			if (part == '') {
-				if (checks[0] == check) {
-					part = check.name;
-				}
-			}*/
-			
-			//if (part.startsWith( '*' ) ) part = part.substr( 1 ).trim();
 			
 			if (checks[0] == check) {
 				
@@ -216,49 +216,39 @@ class Ede {
 		
 		var nexprs:Array<Expr> = [];
 		
+		// If the `:usage` metadata exists on the class and it has haxelib
+		// in the string value, assume its a haxelib run module and remove
+		// the last arg which is the directory the command was called from.
+		var haxelib = if (cls.meta.has(':usage') && cls.meta.get().get(':usage').params.printExprs('').indexOf('haxelib') > -1) {
+			macro _argCopy.pop();
+		} else {
+			macro @:mergeBlock {};
+		}
+		
+		// Turn all the expressions in `typecasts` into a block of code.
+		var block = macro @:mergeBlock $b { typecasts };
+		
 		// Expressions to be put before everything else already in the constructor.
-		//nexprs.push( macro if (args.length == 0) Sys.print( help() ) );
-		nexprs.push( macro var _cmd:uhx.sys.Lod = new uhx.sys.Lod() );
-		nexprs.push( macro _cmd.args = args );
-		nexprs.push( macro var _map = _cmd.parse() );
-		nexprs = nexprs.concat( typecasts );
-		nexprs.push( macro var _line:uhx.sys.Liy = new uhx.sys.Liy() );
-		nexprs.push( macro _line.obj = this );
-		nexprs.push( macro _line.fields = [$a { instances } ] );
-		nexprs.push( macro _line.meta = haxe.rtti.Meta.getFields( $i { cls.name } ) );
-		nexprs.push( macro _line.args = _map );
-		nexprs.push( macro _line.parse() );
+		nexprs.push( macro @:mergeBlock {
+			$haxelib;
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( args.copy() );
+			var _map = _cmd.parse();
+			$block;
+		} );
 		
 		var method = _new.getMethod();
 		
 		switch (method.expr.expr) {
 			case EBlock( es ):
-				_new.body( { expr: EBlock( nexprs.concat( es ) ), pos: _new.pos } );
+				method.expr = macro {
+					$b { nexprs };
+					$b { es };
+				}
 				
 			case _:
 		}
-		trace( [for (f in fields) f.printField()].join('\n') );
+		//trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
-	}
-	
-	private static function valueCast(type:String):Expr {
-		var result = macro v;
-		
-		switch ( type ) {
-			case 'Int':
-				result = macro Std.parseInt( v );
-				
-			case 'Float':
-				result = macro Std.parseFloat( v );
-				
-			case 'Bool':
-				result = macro if ((v = v.toLowerCase()) == 'true') true else if (v == 'false') false else true;
-				
-			case 'String':
-				result = macro v;
-		}
-		
-		return result;
 	}
 	
 }

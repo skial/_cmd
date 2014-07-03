@@ -19,8 +19,11 @@ class Liy {
 	public var args:StringMap<Array<Dynamic>>;
 	public var meta:Dynamic<Dynamic<Array<Dynamic>>>;
 
-	public function new() {
-		
+	public function new(obj:Dynamic, fields:Array<String>, args:StringMap<Array<Dynamic>>, meta:Dynamic<Dynamic<Array<Dynamic>>>) {
+		this.obj = obj;
+		this.fields = fields;
+		this.args = args;
+		this.meta = meta;
 	}
 	
 	public function parse():Void {
@@ -63,15 +66,15 @@ class Liy {
 			}
 			
 			if (values.length != 0) {
-			
-				var f = Reflect.field( obj, field );
+				
+				var f = Reflect.getProperty( obj, field );
 				if (Reflect.isFunction( f )) {
 					
 					Reflect.callMethod( obj, f, values.slice( 0, arity ) );
 					
 				} else if (values.length > 0) {
 					
-					Reflect.setField( obj, field, values[0] );
+					Reflect.setProperty( obj, field, Std.is(obj, Array) ? values : values[0] );
 					
 				}
 				
