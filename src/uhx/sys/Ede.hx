@@ -103,21 +103,16 @@ class Ede {
 						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
 						
 						var aliases = [macro $v { field.name } ]
-							.concat( 
-								field.meta
-									.filter( function(m) return m.name == 'alias' )
-									.map( function(m) return m.params[0] ) 
-							);
+						.concat( 
+							field.meta
+							.filter( function(m) return m.name == 'alias' )
+							.map( function(m) return m.params[0] ) 
+						);
 						
 						var argcasts:Array<Expr> = [];
 						
 						for (i in 0...m.args.length) {
-							
-							argcasts.push( macro @:mergeBlock {
-								var v = _args[$v { i } ];
-								v = $e { Jete.coerce( m.args[i].type, macro v ) };
-							} );
-							
+							argcasts.push( macro $e { Jete.coerce( m.args[i].type, macro _args[$v { i } ] ) } );
 						}
 						
 						var block = if (m.args.length > 0) {
@@ -125,21 +120,23 @@ class Ede {
 								var _args = _map.get( name );
 								
 								if (_args.length < $v { m.args.length } ) {
-									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + m.args.length + ' args.' };
+									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' args.' };
+									
 								} else {
-									@:mergeBlock $b{argcasts};
+									var _args = _map.get( name );
+									$p { ['this', field.name] } ($a { argcasts } );
+									
 								}
 							}
+							
 						} else {
 							macro $p { ['this', field.name] } ();
+							
 						}
+						
 						typecasts.push(
 							macro for (name in [$a { aliases } ]) {
-								if (_map.exists( name )) {
-									
-									$block;
-									
-								}
+								if (_map.exists( name )) $block;
 							}
 						);
 						
