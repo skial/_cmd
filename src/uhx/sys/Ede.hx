@@ -116,7 +116,7 @@ class Ede {
 						}
 						
 						var block = if (m.args.length > 0) {
-							macro @:mergeBlock {
+							macro {
 								var _args = _map.get( name );
 								
 								if (_args.length < $v { m.args.length } ) {
@@ -130,7 +130,10 @@ class Ede {
 							}
 							
 						} else {
-							macro $p { ['this', field.name] } ();
+							macro {
+								$p { ['this', field.name] } ();
+								break;
+							}
 							
 						}
 						
