@@ -124,7 +124,7 @@ class Lod {
 			}
 			
 		}
-		trace( result );
+		
 		return result;
 	}
 	

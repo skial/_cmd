@@ -48,7 +48,6 @@ class Liy {
 				
 				if (meta.field( field ).hasField( 'alias' )) {
 					names = names.concat( meta.field( field ).alias );
-					trace( names );
 				}
 				
 				if (meta.field( field ).hasField( 'arity' )) {
@@ -74,10 +73,6 @@ class Liy {
 					Reflect.callMethod( obj, f, values.slice( 0, arity ) );
 					
 				} else if (values.length > 0) {
-					
-					for (field in Type.getInstanceFields( Type.getClass( obj ) ) ) {
-						trace( field, Reflect.hasField( obj, field ) );
-					}
 					
 					Reflect.setProperty( obj, field, Std.is(obj, Array) ? values : values[0] );
 					

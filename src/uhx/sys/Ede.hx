@@ -53,16 +53,10 @@ class Ede {
 			.addMeta( { name: 'alias', params: [ macro 'h' ], pos: Context.currentPos() } )
 		);
 		
-		// Build a lists of instance field names.
-		var instances:Array<Expr> = [];
 		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
 		
 		for (field in fields) if (!field.access.has( APrivate )) {
-			
-			if (!field.access.has( AStatic ) && field.name != 'new') {
-				instances.push( macro $v { field.name } );
-			}
 			
 			switch (field.kind) {
 				case FVar(t, _), FProp(_, _, t, _):
@@ -76,7 +70,7 @@ class Ede {
 					var access = if (isArray) {
 						macro var v:Array<String> = cast _map.get( name );
 					} else {
-						macro var v:String = cast _map.get( $v { field.name } )[0];
+						macro var v:String = cast _map.get( name )[0];
 					}
 					
 					var e = Jete.coerce(t, macro v);
@@ -148,8 +142,6 @@ class Ede {
 			
 		}
 		
-		instances.push( macro 'help' );
-		
 		// Get all doc info.
 		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [ 
 			for (f in fields) 
@@ -163,16 +155,6 @@ class Ede {
 		for (check in checks) {
 			var part = '';
 			if (check.doc == null) check.doc = '';
-			
-			/*var part = check.doc.replace( '\n', '' ).replace('\t', '').replace('*', '').trim();
-			
-			if (part == '') {
-				if (checks[0] == check) {
-					part = check.name;
-				}
-			}*/
-			
-			//if (part.startsWith( '*' ) ) part = part.substr( 1 ).trim();
 			
 			if (checks[0] == check) {
 				
@@ -234,14 +216,13 @@ class Ede {
 		
 		var nexprs:Array<Expr> = [];
 		
-		
 		// If the `:usage` metadata exists on the class and it has haxelib
 		// in the string value, assume its a haxelib run module and remove
 		// the last arg which is the directory the command was called from.
 		var haxelib = if (cls.meta.has(':usage') && cls.meta.get().get(':usage').params.printExprs('').indexOf('haxelib') > -1) {
 			macro _argCopy.pop();
 		} else {
-			macro null;
+			macro @:mergeBlock {};
 		}
 		
 		// Turn all the expressions in `typecasts` into a block of code.
@@ -249,27 +230,24 @@ class Ede {
 		
 		// Expressions to be put before everything else already in the constructor.
 		nexprs.push( macro @:mergeBlock {
-			var _argCopy = args.copy();
 			$haxelib;
-			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( args.copy() );
 			var _map = _cmd.parse();
 			$block;
-			/*var _line:uhx.sys.Liy = new uhx.sys.Liy(
-				this, [$a { instances } ], _map,
-				haxe.rtti.Meta.getFields( $i { cls.name } )
-			);
-			_line.parse();*/
 		} );
 		
 		var method = _new.getMethod();
 		
 		switch (method.expr.expr) {
 			case EBlock( es ):
-				_new.body( { expr: EBlock( nexprs.concat( es ) ), pos: _new.pos } );
+				method.expr = macro {
+					$b { nexprs };
+					$b { es };
+				}
 				
 			case _:
 		}
-		trace( [for (f in fields) f.printField()].join('\n') );
+		//trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
 	}
 	
