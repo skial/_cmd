@@ -46,6 +46,13 @@ class Ede {
 			Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
 		}
 		
+		// Add commandline methods if they dont exist.
+		fields.push( 'help'.mkField().mkPublic()
+			.toFFun().body( macro { } )
+			.addDoc( 'Show this message.' )
+			.addMeta( { name: 'alias', params: [ macro 'h' ], pos: Context.currentPos() } )
+		);
+		
 		// Build a lists of instance field names.
 		var instances:Array<Expr> = [];
 		// An array of expressions which cast the argument to the fields type.
@@ -90,7 +97,8 @@ class Ede {
 					);
 					
 				case FFun(m):
-					if (m.args.length > 0 && field.name != 'new') {
+					
+					if (field.name != 'new' && field.access.indexOf( AStatic ) == -1) {
 						
 						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
 						
@@ -112,17 +120,24 @@ class Ede {
 							
 						}
 						
+						var block = if (m.args.length > 0) {
+							macro @:mergeBlock {
+								var _args = _map.get( name );
+								
+								if (_args.length < $v { m.args.length } ) {
+									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + m.args.length + ' args.' };
+								} else {
+									@:mergeBlock $b{argcasts};
+								}
+							}
+						} else {
+							macro $p { ['this', field.name] } ();
+						}
 						typecasts.push(
 							macro for (name in [$a { aliases } ]) {
 								if (_map.exists( name )) {
 									
-									var _args = _map.get( name );
-									
-									if (_args.length < $v { m.args.length } ) {
-										throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-'+name) + $v { ' expects ' + m.args.length + ' args.' };
-									} else {
-										$a{argcasts};
-									}
+									$block;
 									
 								}
 							}
@@ -132,13 +147,6 @@ class Ede {
 			}
 			
 		}
-		
-		// Add commandline methods if they dont exist.
-		fields.push( 'help'.mkField().mkPublic()
-			.toFFun().body( macro { } )
-			.addDoc( 'Show this message.' )
-			.addMeta( { name: 'alias', params: [ macro 'h' ], pos: Context.currentPos() } )
-		);
 		
 		instances.push( macro 'help' );
 		
