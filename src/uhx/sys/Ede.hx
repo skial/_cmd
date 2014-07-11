@@ -230,8 +230,9 @@ class Ede {
 		
 		// Expressions to be put before everything else already in the constructor.
 		nexprs.push( macro @:mergeBlock {
+			var _argCopy = args.copy();
 			$haxelib;
-			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( args.copy() );
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
 			var _map = _cmd.parse();
 			$block;
 		} );
