@@ -220,7 +220,7 @@ class Ede {
 			
 		}
 		
-		var expr = Context.defined('sys') ? macro Sys.print( $v { docs.join( '' ) } ) : macro trace( $v { docs.join( '' ) } );
+		var expr = Context.defined('sys') ? macro @:mergeBlock { Sys.print( $v { docs.join( '' ) } ); Sys.exit(0); } : macro trace( $v { docs.join( '' ) } );
 		fields.get( 'help' ).body( macro { $expr; } );
 		
 		var nexprs:Array<Expr> = [];
