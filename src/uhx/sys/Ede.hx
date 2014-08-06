@@ -70,7 +70,7 @@ class Ede {
 					var access = if (isArray) {
 						macro var v:Array<String> = cast _map.get( name );
 					} else {
-						macro var v:String = cast _map.get( name )[0];
+						macro var v:String = cast _map.get( $v { field.name } )[0];
 					}
 					
 					var e = Jete.coerce(t, macro v);
