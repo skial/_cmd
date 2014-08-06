@@ -9,6 +9,7 @@
   "version": "0.0.1-alpha",
   "url": "https://github.com/skial/cmd",
   "dependencies": {
+	"uhu": "",
     "klas": "",
 	"jete": ""
   }

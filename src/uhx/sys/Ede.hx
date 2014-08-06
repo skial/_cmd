@@ -46,7 +46,7 @@ class Ede {
 			Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
 		}
 		
-		// Add commandline methods if they dont exist.
+		// Add commandline help methods if they dont exist.
 		fields.push( 'help'.mkField().mkPublic()
 			.toFFun().body( macro { } )
 			.addDoc( 'Show this message.' )
@@ -74,6 +74,15 @@ class Ede {
 					}
 					
 					var e = Jete.coerce(t, macro v);
+					// Bool values do not require a value eg `cmd -v` means v is true.
+					e = switch (t) {
+						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
+							macro (v == null) ? true : $e;
+							
+						case _:
+							e;
+							
+					}
 					
 					typecasts.push( 
 						aliases.length > 1 ?
