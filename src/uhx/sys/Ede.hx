@@ -67,8 +67,8 @@ class Ede {
 					
 					var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
 					
-					var access = if (isArray) {
-						macro var v:Array<String> = cast _map.get( name );
+					var access = if (aliases.length > 1) {
+						macro var v:String = cast _map.get( name )[0];
 					} else {
 						macro var v:String = cast _map.get( $v { field.name } )[0];
 					}
@@ -257,7 +257,7 @@ class Ede {
 				
 			case _:
 		}
-		//trace( [for (f in fields) f.printField()].join('\n') );
+		trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
 	}
 	
