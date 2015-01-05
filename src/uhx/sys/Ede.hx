@@ -257,7 +257,7 @@ class Ede {
 				
 			case _:
 		}
-		trace( [for (f in fields) f.printField()].join('\n') );
+		//trace( [for (f in fields) f.printField()].join('\n') );
 		return fields;
 	}
 	
