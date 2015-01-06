@@ -9,7 +9,7 @@ import haxe.macro.Compiler;
 
 using Lambda;
 using StringTools;
-using uhu.macro.Jumla;
+using haxe.macro.Tools;
 
 /**
  * ...
@@ -36,22 +36,34 @@ class Ede {
 	public static function handler(cls:ClassType, fields:Array<Field>):Array<Field> {
 		if (Context.defined( 'display' )) return fields;
 		
-		if (!fields.exists( 'new' )) {
+		var _new:Field = fields.filter( function(f) return switch(f) { case { name:'new' } :true; case _:false; } )[0];
+		
+		if (_new == null) {
 			throw 'Only class instances are supported';
 		}
 		
-		var _new = fields.get( 'new' );
-		
-		if (!_new.args().exists( 'args' ))  {
-			Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
+		switch (_new.kind) { 
+			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
+				Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
+				
+			case _:
+				
 		}
 		
+		var printer = new Printer();
+		
 		// Add commandline help methods if they dont exist.
-		fields.push( 'help'.mkField().mkPublic()
-			.toFFun().body( macro { } )
-			.addDoc( 'Show this message.' )
-			.addMeta( { name: 'alias', params: [ macro 'h' ], pos: Context.currentPos() } )
-		);
+		fields.push( {
+			name:'help',
+			access: [APublic],
+			kind: FFun( {
+				args: [],
+				ret: null,
+				expr: macro { }
+			} ),
+			doc: 'Show this message.',
+			pos: Context.currentPos()
+		} );
 		
 		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
@@ -61,16 +73,14 @@ class Ede {
 			switch (field.kind) {
 				case FVar(t, _), FProp(_, _, t, _):
 					var tname = t.toType().getName();
+					var aliases = [macro $v { field.name } ];
 					
-					var aliases = [macro $v { field.name } ]
-						.concat( field.meta.exists('alias') ? field.meta.get('alias').params : [] );
-					
-					var isArray = t.match( TPath( { name:'Array', pack:_, params:_, sub:_ } ) );
+					field.meta.filter( function(meta) return meta.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
 					
 					var access = if (aliases.length > 1) {
-						macro var v:String = cast _map.get( name )[0];
+						macro var v:String = (_map.get( name )[0]:String);
 					} else {
-						macro var v:String = cast _map.get( $v { field.name } )[0];
+						macro var v:String = (_map.get( $v { field.name } )[0]:String);
 					}
 					
 					var e = Jete.coerce(t, macro v);
@@ -103,14 +113,11 @@ class Ede {
 					
 					if (field.name != 'new' && field.access.indexOf( AStatic ) == -1) {
 						
+						if (field.meta == null) field.meta = [];
 						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
 						
-						var aliases = [macro $v { field.name } ]
-						.concat( 
-							field.meta
-							.filter( function(m) return m.name == 'alias' )
-							.map( function(m) return m.params[0] ) 
-						);
+						var aliases = [macro $v { field.name } ];
+						field.meta.filter( function(m) return m.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
 						
 						var argcasts:Array<Expr> = [];
 						
@@ -126,7 +133,6 @@ class Ede {
 									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' args.' };
 									
 								} else {
-									var _args = _map.get( name );
 									$p { ['this', field.name] } ($a { argcasts } );
 									
 								}
@@ -171,9 +177,9 @@ class Ede {
 					
 					docs.push( 'Usage:\n' );
 					
-					for (param in cls.meta.get().get(':usage').params) {
+					for (meta in cls.meta.get().filter( function(m) return m.name == ':usage' )) for (param in meta.params) {
 						
-						docs.push( '\t' + param.printExpr().replace('"', '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
+						docs.push( '\t' + printer.printExpr( param ).replace('"', '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
 						
 					}
 					
@@ -183,13 +189,13 @@ class Ede {
 				
 			} else {
 				
-				var aliases = check.meta.get( 'alias' );
+				var aliases = check.meta.filter( function(m) return m.name == 'alias' );
 				
 				part = '--${check.name}\t$part';
 				
-				if (aliases != null) for (alias in aliases.params) {
+				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					
-					part = '-' + alias.printExpr().replace('"', '') + ', $part';
+					part = '-' + printer.printExpr( param ).replace('"', '') + ', $part';
 					
 				}
 				
@@ -221,14 +227,17 @@ class Ede {
 		}
 		
 		var expr = Context.defined('sys') ? macro @:mergeBlock { Sys.print( $v { docs.join( '' ) } ); Sys.exit(0); } : macro trace( $v { docs.join( '' ) } );
-		fields.get( 'help' ).body( macro { $expr; } );
+		switch (fields.filter( function(f) return f.name == 'help' )[0].kind) {
+			case FFun(m): m.expr = macro { $expr; };
+			case _:
+		}
 		
 		var nexprs:Array<Expr> = [];
 		
 		// If the `:usage` metadata exists on the class and it has haxelib
 		// in the string value, assume its a haxelib run module and remove
 		// the last arg which is the directory the command was called from.
-		var haxelib = if (cls.meta.has(':usage') && cls.meta.get().get(':usage').params.printExprs('').indexOf('haxelib') > -1) {
+		var haxelib = if (cls.meta.has(':usage') && printer.printExprs( cls.meta.get().filter( function(m) return m.name == ':usage')[0].params, '' ).indexOf('haxelib') > -1) {
 			macro _argCopy.pop();
 		} else {
 			macro @:mergeBlock {};
@@ -246,18 +255,22 @@ class Ede {
 			$block;
 		} );
 		
-		var method = _new.getMethod();
-		
-		switch (method.expr.expr) {
-			case EBlock( es ):
-				method.expr = macro {
+		switch (_new.kind) {
+			case FFun(m):
+				m.expr = macro {
 					$b { nexprs };
-					$b { es };
+					$b { switch (m.expr.expr) {
+						case EBlock(es): es;
+						case _: [];
+					} };
 				}
 				
 			case _:
+				
+				
 		}
-		//trace( [for (f in fields) f.printField()].join('\n') );
+		
+		//trace( [for (f in fields) printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
