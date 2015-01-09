@@ -179,7 +179,7 @@ class Ede {
 					
 					for (meta in cls.meta.get().filter( function(m) return m.name == ':usage' )) for (param in meta.params) {
 						
-						docs.push( '\t' + printer.printExpr( param ).replace('"', '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
+						docs.push( '\t' + printer.printExpr( param ).replace('"', '').replace("'", '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
 						
 					}
 					
@@ -195,11 +195,11 @@ class Ede {
 				
 				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					
-					part = '-' + printer.printExpr( param ).replace('"', '') + ', $part';
+					part = '-' + printer.printExpr( param ).replace('"', '').replace("'", '') + ', $part';
 					
 				}
 				
-				var desc = check.doc.replace('\n', '').replace('\r', '').replace('\t', '').replace('*', '').replace('  ', ' ').trim();
+				var desc = check.doc.replace('\\n', '').replace('\\r', '').replace('\\t', '').replace('*', '').replace('  ', ' ').trim();
 				var counter = 0, length = 0;
 				
 				while (length < desc.length) {
@@ -259,7 +259,7 @@ class Ede {
 			case FFun(m):
 				m.expr = macro {
 					$b { nexprs };
-					$b { switch (m.expr.expr) {
+					@:mergeBlock $b { switch (m.expr.expr) {
 						case EBlock(es): es;
 						case _: [];
 					} };
@@ -270,7 +270,7 @@ class Ede {
 				
 		}
 		
-		//trace( [for (f in fields) printer.printField( f )].join('\n') );
+		trace( [for (f in fields) printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
