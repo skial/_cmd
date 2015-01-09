@@ -31,6 +31,8 @@ class Ioe {
 		if (i != null) stdin = i;
 		if (o != null) stdout = o;
 		
+		if (exitCode != ExitCode.SUCCESS) exit();
+		
 		var code = -1;
 		// For manually or piped text into `stdin` read each byte.
 		try while (code != eofChar) {
