@@ -61,8 +61,9 @@ class Ede {
 				ret: null,
 				expr: macro { }
 			} ),
-			doc: 'Show this message.',
 			pos: Context.currentPos()
+			doc: 'Show this message.',
+			meta: [ { name:'alias', params:[macro 'h'], pos:Context.currentPos() } ],
 		} );
 		
 		// An array of expressions which cast the argument to the fields type.
@@ -77,13 +78,12 @@ class Ede {
 					
 					field.meta.filter( function(meta) return meta.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
 					
-					var access = if (aliases.length > 1) {
-						macro var v:String = (_map.get( name )[0]:String);
+					var e = if (aliases.length > 1) {
+						macro (_map.get( name )[0]:String);
 					} else {
-						macro var v:String = (_map.get( $v { field.name } )[0]:String);
+						macro (_map.get( $v { field.name } )[0]:String);
 					}
 					
-					var e = Jete.coerce(t, macro v);
 					// Bool values do not require a value eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
@@ -98,13 +98,11 @@ class Ede {
 						aliases.length > 1 ?
 							macro for (name in [$a { aliases } ]) {
 								if (_map.exists( name )) { 
-									$access;
 									$p{['this', field.name]} = $e;
 									break;
 								}
 							} 
 						: macro if (_map.exists( $v { field.name } )) {
-							$access;
 							$p{['this', field.name]} = $e;
 						}
 					);
@@ -114,41 +112,56 @@ class Ede {
 					if (field.name != 'new' && field.access.indexOf( AStatic ) == -1) {
 						
 						if (field.meta == null) field.meta = [];
-						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { m.args.length } ] } );
+						
+						// Separate out required and optional args.
+						var required = m.args.filter( function(a) return a.opt == null || a.opt == false );
+						var optional = m.args.filter( function(a) return a.opt != null && a.opt == true );
+						
+						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { required.length } ] } );
+						if (optional.length > 0) field.meta.push( { name:'optional_arity', pos:field.pos, params:[macro $v { optional.length } ] } );
 						
 						var aliases = [macro $v { field.name } ];
 						field.meta.filter( function(m) return m.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
 						
 						var argcasts:Array<Expr> = [];
 						
-						for (i in 0...m.args.length) {
-							argcasts.push( macro $e { Jete.coerce( m.args[i].type, macro _args[$v { i } ] ) } );
+						for (i in 0...required.length) {
+							argcasts.push( macro $e { Jete.coerce( required[i].type, macro _args[$v { i } ] ) } );
 						}
 						
-						var block = if (m.args.length > 0) {
+						var block = function(name:Expr) return if (required.length > 0 || optional.length > 0) {
 							macro {
-								var _args = _map.get( name );
+								var _args = _map.get( $name );
 								
-								if (_args.length < $v { m.args.length } ) {
-									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' arg' + (m.args.length > 1 ? 's' : '') + '.' };
-									
+								$e{required.length > 0 ? macro @:mergeBlock {
+									if (_args.length < $v { required.length }) {
+										throw '' + ($name == $v { field.name } ?$v { '--' + field.name } :'-' + $name) + $v { ' expects ' + required.length + ' arg' + (required.length > 1 ? 's' : '') + '.' };
+										
+									}
+								}: macro @:mergeBlock {} }
+								
+								if (_args.length > $v { (required.length + optional.length)-1 } ) {
+									$p { ['this', field.name] } ($a { argcasts.concat( [for (i in 0...optional.length) macro $e { Jete.coerce(optional[i].type, macro _args[$v { required.length + i } ]) } ]) } );
 								} else {
 									$p { ['this', field.name] } ($a { argcasts } );
-									
 								}
 							}
 							
 						} else {
-							macro {
-								$p { ['this', field.name] } ();
-								break;
-							}
+							macro $p { ['this', field.name] } ();
 							
 						}
 						
 						typecasts.push(
-							macro for (name in [$a { aliases } ]) {
-								if (_map.exists( name )) $block;
+							if (aliases.length == 1) {
+								macro if (_map.exists( $e { aliases[0] } )) $e { block(aliases[0]) };
+							} else {
+								macro for (name in [$a { aliases } ]) {
+									if (_map.exists( name )) {
+										$e { block(macro name) };
+										break;
+									}
+								}
 							}
 						);
 						
