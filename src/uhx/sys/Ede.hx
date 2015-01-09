@@ -130,7 +130,7 @@ class Ede {
 								var _args = _map.get( name );
 								
 								if (_args.length < $v { m.args.length } ) {
-									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' args.' };
+									throw '' + (name == $v { field.name } ?$v { '--' + field.name } :'-' + name) + $v { ' expects ' + m.args.length + ' arg' + (m.args.length > 1 ? 's' : '') + '.' };
 									
 								} else {
 									$p { ['this', field.name] } ($a { argcasts } );
@@ -220,7 +220,7 @@ class Ede {
 					
 				}
 				
-				docs.push( '\t$part' + '\n' + (desc != null && desc != '' ? '\t$desc\n\n' : '') );
+				docs.push( '\t$part' + (desc != null && desc != '' ? '\t$desc' : '') + '\n' );
 				
 			}
 			
