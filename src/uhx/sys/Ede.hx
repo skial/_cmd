@@ -36,7 +36,7 @@ class Ede {
 	public static function handler(cls:ClassType, fields:Array<Field>):Array<Field> {
 		if (Context.defined( 'display' )) return fields;
 		
-		var _new:Field = fields.filter( function(f) return switch(f) { case { name:'new' } :true; case _:false; } )[0];
+		var _new:Field = fields.filter( function(f) return f.name == 'new' )[0];
 		
 		if (_new == null) {
 			throw 'Only class instances are supported';
@@ -44,7 +44,7 @@ class Ede {
 		
 		switch (_new.kind) { 
 			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
-				Context.error( 'Field `new` must have a param named `args` of type `Array<String>`', _new.pos );
+				Context.error( 'Field `new` must have a parameter named `args` of type `Array<String>`', _new.pos );
 				
 			case _:
 				
@@ -61,7 +61,7 @@ class Ede {
 				ret: null,
 				expr: macro { }
 			} ),
-			pos: Context.currentPos()
+			pos: Context.currentPos(),
 			doc: 'Show this message.',
 			meta: [ { name:'alias', params:[macro 'h'], pos:Context.currentPos() } ],
 		} );
@@ -270,12 +270,27 @@ class Ede {
 		
 		switch (_new.kind) {
 			case FFun(m):
-				m.expr = macro {
-					$b { nexprs };
-					@:mergeBlock $b { switch (m.expr.expr) {
-						case EBlock(es): es;
-						case _: [];
-					} };
+				var index = -1;
+				var exprs = [];
+				switch (m.expr.expr) {
+					case EBlock(es):
+						exprs = es;
+						for (i in 0...es.length) switch (es[i]) {
+							case { expr:EMeta( { name:':cmd' }, _) } :
+								index = i;
+								break;
+								
+							case _:
+								
+						}
+						
+					case _:
+						
+				}
+				if (index == -1) {
+					m.expr = macro $b { nexprs.concat(exprs) };
+				} else {
+					m.expr = macro $b { exprs.slice(0, index).concat( nexprs ).concat( exprs.slice(index + 1) ) };
 				}
 				
 			case _:
