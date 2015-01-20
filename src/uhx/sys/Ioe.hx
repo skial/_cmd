@@ -18,7 +18,7 @@ class Ioe {
 	private var stdout:Output;
 	private var stderr:Output;
 	private var content:String;
-	private var exitCode:ExitCode;
+	private var exitCode:ExitCode = ExitCode.SUCCESS;
 
 	public function new() {
 		content = '';
