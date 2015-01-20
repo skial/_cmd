@@ -63,7 +63,7 @@ class Ede {
 			} ),
 			pos: Context.currentPos(),
 			doc: 'Show this message.',
-			meta: [ { name:'alias', params:[macro 'h'], pos:Context.currentPos() } ],
+			meta: [ { name:'alias', params:[macro '?'], pos:Context.currentPos() } ],
 		} );
 		
 		// An array of expressions which cast the argument to the fields type.
@@ -87,7 +87,7 @@ class Ede {
 					// Bool values do not require a value eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
-							macro (v == null) ? true : $e;
+							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
 							
 						case _:
 							e;
@@ -298,7 +298,7 @@ class Ede {
 				
 		}
 		
-		trace( [for (f in fields) printer.printField( f )].join('\n') );
+		//trace( [for (f in fields) printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
