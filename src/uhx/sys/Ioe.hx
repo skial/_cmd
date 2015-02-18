@@ -27,7 +27,7 @@ class Ioe {
 		stderr = Sys.stderr();
 	}
 	
-	private function process(i:Input = null, o:Output = null) {
+	private function process(i:Input = null, o:Output = null):Void {
 		if (i != null) stdin = i;
 		if (o != null) stdout = o;
 		
