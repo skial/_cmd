@@ -90,7 +90,7 @@ class Ede {
 							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
 							
 						case _:
-							e;
+							macro $ { Jete.coerce(t, e) };
 							
 					}
 					
