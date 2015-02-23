@@ -86,6 +86,9 @@ class Ede {
 					
 					// Bool values do not require a value eg `cmd -v` means v is true.
 					e = switch (t) {
+						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
+							macro cast _map.get( name );
+							
 						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
 							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
 							
@@ -262,7 +265,7 @@ class Ede {
 		// Expressions to be put before everything else already in the constructor.
 		nexprs.push( macro @:mergeBlock {
 			var _argCopy = args.copy();
-			$haxelib;
+			//$haxelib;
 			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
 			var _map = _cmd.parse();
 			$block;
