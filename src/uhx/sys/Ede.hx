@@ -20,7 +20,7 @@ class Ede {
 	
 	public static macro function initialize():Void {
 		try {
-			KlasImp.initalize();
+			KlasImp.initialize();
 			KlasImp.CLASS_META.set(':cmd', Ede.handler);
 		} catch (e:Dynamic) {
 			// This assumes that `implements Klas` is not being used
