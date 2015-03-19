@@ -21,7 +21,7 @@ class Ede {
 	public static macro function initialize():Void {
 		try {
 			KlasImp.initialize();
-			KlasImp.CLASS_META.set(':cmd', Ede.handler);
+			KlasImp.classMetadata.add(':cmd', Ede.handler);
 		} catch (e:Dynamic) {
 			// This assumes that `implements Klas` is not being used
 			// but `@:autoBuild` or `@:build` metadata is being used 
