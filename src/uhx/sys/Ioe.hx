@@ -13,7 +13,7 @@ using StringTools;
  */
 class Ioe {
 	
-	@:isVar private var eofChar(get, null):Int;
+	@:isVar private var eofChar(get, null):Null<Int>;
 	private var stdin:Input;
 	private var stdout:Output;
 	private var stderr:Output;
@@ -55,7 +55,7 @@ class Ioe {
 		Sys.exit( exitCode );
 	}
 	
-	@:noCompletion private function get_eofChar():Int {
+	@:noCompletion private function get_eofChar():Null<Int> {
 		if (eofChar == null) eofChar = switch (Sys.systemName().toLowerCase()) {
 			case 'windows': 26;	//	^Z
 			case _: 4; 			//	^D
