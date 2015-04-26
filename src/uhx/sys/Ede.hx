@@ -63,7 +63,7 @@ class Ede {
 			} ),
 			pos: Context.currentPos(),
 			doc: 'Show this message.',
-			meta: [ { name:'alias', params:[macro '?'], pos:Context.currentPos() } ],
+				meta: [ { name:'alias', params:[macro 'h', macro '?'], pos:Context.currentPos() } ],
 		} );
 		
 		// An array of expressions which cast the argument to the fields type.
