@@ -120,7 +120,7 @@ class Ede {
 						if (optional.length > 0) field.meta.push( { name:'optional_arity', pos:field.pos, params:[macro $v { optional.length } ] } );
 						
 						var aliases = [macro $v { field.name } ];
-						field.meta.filter( function(m) return m.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
+						for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
 						
 						var argcasts:Array<Expr> = [];
 						
