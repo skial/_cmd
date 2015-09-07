@@ -72,7 +72,7 @@ class Ede {
 				case FVar(t, _), FProp(_, _, t, _):
 					var aliases = [macro $v { field.name } ];
 					
-					field.meta.filter( function(meta) return meta.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
+					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
 					
 					var e = if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
