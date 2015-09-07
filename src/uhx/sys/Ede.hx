@@ -70,7 +70,6 @@ class Ede {
 			
 			switch (field.kind) {
 				case FVar(t, _), FProp(_, _, t, _):
-					var tname = t.toType().getName();
 					var aliases = [macro $v { field.name } ];
 					
 					field.meta.filter( function(meta) return meta.name == 'alias' ).iter( function(m) aliases = aliases.concat( m.params ) );
