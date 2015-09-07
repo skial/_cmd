@@ -1,6 +1,5 @@
 package uhx.sys;
 
-import haxe.macro.Printer;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import uhx.macro.KlasImp;
@@ -49,8 +48,6 @@ class Ede {
 			case _:
 				
 		}
-		
-		var printer = new Printer();
 		
 		// Add commandline help methods if they dont exist.
 		fields.push( {
@@ -195,7 +192,7 @@ class Ede {
 					
 					for (meta in cls.meta.get().filter( function(m) return m.name == ':usage' )) for (param in meta.params) {
 						
-						docs.push( '\t' + printer.printExpr( param ).replace('"', '').replace("'", '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
+						docs.push( '\t' + KlasImp.printer.printExpr( param ).replace('"', '').replace("'", '').replace('\\n', '\n').replace('\\t', '\t') + '\n' );
 						
 					}
 					
@@ -211,7 +208,7 @@ class Ede {
 				
 				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					
-					part = '-' + printer.printExpr( param ).replace('"', '').replace("'", '') + ', $part';
+					part = '-' + KlasImp.printer.printExpr( param ).replace('"', '').replace("'", '') + ', $part';
 					
 				}
 				
@@ -253,7 +250,7 @@ class Ede {
 		// If the `:usage` metadata exists on the class and it has haxelib
 		// in the string value, assume its a haxelib run module and remove
 		// the last arg which is the directory the command was called from.
-		var haxelib = if (cls.meta.has(':usage') && printer.printExprs( cls.meta.get().filter( function(m) return m.name == ':usage')[0].params, '' ).indexOf('haxelib') > -1) {
+		var haxelib = if (cls.meta.has(':usage') && KlasImp.printer.printExprs( cls.meta.get().filter( function(m) return m.name == ':usage')[0].params, '' ).indexOf('haxelib') > -1) {
 			macro _argCopy.pop();
 		} else {
 			macro @:mergeBlock {};
@@ -303,7 +300,7 @@ class Ede {
 				
 		}
 		
-		//trace( [for (f in fields) printer.printField( f )].join('\n') );
+		//trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
