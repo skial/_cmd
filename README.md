@@ -23,7 +23,7 @@ The recommended way of using this library is through Ede, either with [Klas](htt
 
 #### With Klas
 
-```
+```Haxe
 package ;
 
 @:cmd
@@ -51,7 +51,7 @@ class Main implements Klas {
 
 #### Without Klas
 
-```
+```Haxe
 package ;
 
 @:cmd
