@@ -2,9 +2,12 @@ package uhx.sys;
 
 import haxe.macro.Type;
 import haxe.macro.Expr;
-import uhx.macro.KlasImp;
 import haxe.macro.Context;
 import haxe.macro.Compiler;
+
+#if klas
+import uhx.macro.KlasImp;
+#end
 
 using Lambda;
 using StringTools;
@@ -19,8 +22,10 @@ class Ede {
 	
 	public static macro function initialize():Void {
 		try {
+			#if klas
 			KlasImp.initialize();
 			KlasImp.classMetadata.add(':cmd', Ede.handler);
+			#end
 		} catch (e:Dynamic) {
 			// This assumes that `implements Klas` is not being used
 			// but `@:autoBuild` or `@:build` metadata is being used 
@@ -141,8 +146,10 @@ class Ede {
 								
 								if (_args.length > $v { (required.length + optional.length)-1 } ) {
 									$p { ['this', field.name] } ($a { argcasts.concat( [for (i in 0...optional.length) macro $e { Jete.coerce(optional[i].type, macro _args[$v { required.length + i } ]) } ]) } );
+									
 								} else {
 									$p { ['this', field.name] } ($a { argcasts } );
+									
 								}
 							}
 							
@@ -154,6 +161,7 @@ class Ede {
 						typecasts.push(
 							if (aliases.length == 1) {
 								macro if (_map.exists( $e { aliases[0] } )) $e { block(aliases[0]) };
+								
 							} else {
 								macro for (name in [$a { aliases } ]) {
 									if (_map.exists( name )) {
@@ -161,6 +169,7 @@ class Ede {
 										break;
 									}
 								}
+								
 							}
 						);
 						
