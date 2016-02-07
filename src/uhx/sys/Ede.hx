@@ -71,7 +71,7 @@ class Ede {
 		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
 		
-		for (field in fields) if (!field.access.has( APrivate )) {
+		for (field in fields) if (!field.access.has( APrivate ) && !field.access.has( AStatic )) {
 			
 			switch (field.kind) {
 				case FVar(t, _), FProp(_, _, t, _):
