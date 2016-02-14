@@ -1,5 +1,6 @@
 package uhx.sys;
 
+import haxe.macro.ComplexTypeTools;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import haxe.macro.Context;
@@ -46,9 +47,18 @@ class Ede {
 			throw 'Only class instances are supported';
 		}
 		
+		var isSubcommand:Bool = false;
+		
 		switch (_new.kind) { 
 			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
 				Context.error( 'Field `new` must have a parameter named `args` of type `Array<String>`', _new.pos );
+				
+			case FFun( { args:args } ):
+				for (arg in args) if (arg.name == 'args') {
+					isSubcommand = Context.unify(arg.type.toType(), (macro:haxe.ds.StringMap<Array<Dynamic>>).toType());
+					if (isSubcommand) break;
+					
+				}
 				
 			case _:
 				
@@ -76,10 +86,19 @@ class Ede {
 			switch (field.kind) {
 				case FVar(t, _), FProp(_, _, t, _):
 					var aliases = [macro $v { field.name } ];
+					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
 					
 					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
 					
-					var e = if (aliases.length > 1) {
+					var e = if (isFieldSubcommand) {
+						function resolveTPath(t:ComplexType) return switch (t) {
+							case TPath(p): p;
+							case _: null;
+							
+						}
+						var tp = resolveTPath(t);
+						macro new $tp(_map);
+					} else if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
 					} else {
 						macro (_map.get( $v { field.name } )[0]:String);
@@ -99,15 +118,30 @@ class Ede {
 					}
 					
 					typecasts.push( 
-						aliases.length > 1 ?
-							macro for (name in [$a { aliases } ]) {
-								if (_map.exists( name )) { 
-									$p{['this', field.name]} = $e;
-									break;
-								}
-							} 
-						: macro if (_map.exists( $v { field.name } )) {
-							$p{['this', field.name]} = $e;
+						if (isFieldSubcommand) {
+							aliases.length > 1 
+							? macro for (name in [$a { aliases } ]) {
+									if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( name ) > -1) { 
+										$p{['this', field.name]} = $e;
+										break;
+									}
+								} 
+							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { field.name } ) > -1) {
+								$p{['this', field.name]} = $e;
+							}
+							
+						} else {
+							aliases.length > 1 
+							? macro for (name in [$a { aliases } ]) {
+									if (_map.exists( name )) { 
+										$p{['this', field.name]} = $e;
+										break;
+									}
+								} 
+							: macro if (_map.exists( $v { field.name } )) {
+								$p{['this', field.name]} = $e;
+							}
+							
 						}
 					);
 					
@@ -268,15 +302,27 @@ class Ede {
 		var block = macro @:mergeBlock $b { typecasts };
 		
 		// Expressions to be put before everything else already in the constructor.
-		nexprs.push( macro @:mergeBlock {
-			var _argCopy = args.copy();
-			#if haxelib
-			$haxelib;
-			#end
-			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
-			var _map = _cmd.parse();
-			$block;
-		} );
+		if (!isSubcommand) {
+			nexprs.push( macro @:mergeBlock {
+				var _argCopy = args.copy();
+				#if haxelib
+				$haxelib;
+				#end
+				var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+				var _map = _cmd.parse();
+				$block;
+			} );
+			
+		} else {
+			nexprs.push( macro @:mergeBlock {
+				#if haxelib
+				$haxelib;
+				#end
+				var _map = args;
+				$block;
+			} );
+			
+		}
 		
 		switch (_new.kind) {
 			case FFun(m):
@@ -308,7 +354,7 @@ class Ede {
 				
 		}
 		
-		//trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+		trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
