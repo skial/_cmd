@@ -87,6 +87,7 @@ class Ede {
 				case FVar(t, _), FProp(_, _, t, _):
 					var aliases = [macro $v { field.name } ];
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
+					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
 					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
 					
@@ -212,10 +213,14 @@ class Ede {
 			
 		}
 		
+		function hasSkipCmd(m:Null<Metadata>):Bool {
+			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter(function(p) return p.expr.match(EConst(CIdent('cmd')))).length > -1) n];
+			return filtered.length > 0;
+		}
 		// Get all doc info.
 		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [ 
 			for (f in fields) 
-				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new') 
+				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new'  && !hasSkipCmd(f.meta)) 
 					f 
 		];
 		checks.unshift( cast cls );
@@ -245,8 +250,9 @@ class Ede {
 			} else {
 				
 				var aliases = check.meta.filter( function(m) return m.name == 'alias' );
+				var isSubcommand = check.meta.filter( function(m) return m.name == ':subcommand' ).length > 0;
 				
-				part = '--${check.name}\t$part';
+				part = (!isSubcommand?'--':'') + '${check.name}\t$part';
 				
 				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					
