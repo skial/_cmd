@@ -376,7 +376,7 @@ class Ede {
 				
 		}
 		
-		trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+		//trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
