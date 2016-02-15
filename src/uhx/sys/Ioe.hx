@@ -49,6 +49,22 @@ class Ioe {
 		content = content.trim();
 	}
 	
+	public function prompt(value:String, options:Map<Array<String>, Bool>):Bool {
+		var result = false;
+		var response = '';
+		
+		stdout.writeString( '$value\n' );
+		response = stdin.readLine();
+		
+		for (keys in options.keys()) if (keys.indexOf( response ) > -1) {
+			result = options.get( keys );
+			break;
+			
+		}
+		
+		return result;
+	}
+	
 	private function exit():Void {
 		stdin.close();
 		stdout.close();
