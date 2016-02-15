@@ -1,6 +1,7 @@
 package uhx.sys;
 
 import haxe.macro.ComplexTypeTools;
+import haxe.macro.Printer;
 import haxe.macro.Type;
 import haxe.macro.Expr;
 import haxe.macro.Context;
@@ -84,7 +85,7 @@ class Ede {
 		for (field in fields) if (!field.access.has( APrivate ) && !field.access.has( AStatic )) {
 			
 			switch (field.kind) {
-				case FVar(t, _), FProp(_, _, t, _):
+				case FVar(t, e), FProp(_, _, t, e):
 					var aliases = [macro $v { field.name } ];
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
@@ -98,7 +99,22 @@ class Ede {
 							
 						}
 						var tp = resolveTPath(t);
-						macro new $tp(_map);
+						
+						var res = if (e != null) {
+							macro $e(_map);
+							
+						} else {
+							macro new $tp(_map);
+							
+						}
+						
+						if (e != null) switch (field.kind) {
+							case FVar(t, e): field.kind = FVar(t, null);
+							case FProp(g, s, t, e): field.kind = FProp(g, s, t, null);
+							case _:
+						}
+						
+						res;
 					} else if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
 					} else {
