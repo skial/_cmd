@@ -1,5 +1,6 @@
 package uhx.sys;
 
+import haxe.ds.ArraySort;
 import haxe.macro.ComplexTypeTools;
 import haxe.macro.Printer;
 import haxe.macro.Type;
@@ -65,10 +66,26 @@ class Ede {
 				
 		}
 		
+		function extendsCommand(parent:ClassType):Bool {
+			var result = false;
+			
+			if (!parent.meta.has(':cmd') && parent.superClass != null) {
+				result = extendsCommand( parent.superClass.t.get() );
+				
+			} else {
+				result = parent.meta.has(':cmd');
+				
+			}
+			
+			return result;
+		}
+		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
+		var helpAccess = [APublic];
+		if (inheritsCommand) helpAccess.push( AOverride );
 		// Add commandline help methods if they dont exist.
 		fields.push( {
 			name:'help',
-			access: [APublic],
+			access: helpAccess,
 			kind: FFun( {
 				args: [],
 				ret: null,
@@ -234,11 +251,31 @@ class Ede {
 			return filtered.length > 0;
 		}
 		// Get all doc info.
-		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [ 
-			for (f in fields) 
+		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [];
+		
+		function processParents(parent:ClassType) {
+			if (parent.superClass != null) processParents( parent.superClass.t.get() );
+			
+			for (field in parent.fields.get()) if (field.isPublic && field.name != 'help') {
+				checks.push( { doc:field.doc, meta:field.meta.get(), name:field.name } );
+				
+			}
+			
+		}
+		
+		if (cls.superClass != null) processParents( cls.superClass.t.get() );
+		
+		checks = checks.concat( [for (f in fields) 
 				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new'  && !hasSkipCmd(f.meta)) 
 					f 
-		];
+		] );
+		
+		ArraySort.sort(checks, function(a, b) {
+			var c = [for (m in a.meta) if (m.name == ':subcommand') m].length;
+			var d = [for (m in b.meta) if (m.name == ':subcommand') m].length;
+			return c > 0 && d > 0 ? 0 : c > 0 ? -1 : 1;
+		});
+		
 		checks.unshift( cast cls );
 		
 		var docs:Array<String> = [];
@@ -376,7 +413,7 @@ class Ede {
 				
 		}
 		
-		//trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+		//trace( cls.name, [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
 		return fields;
 	}
 	
