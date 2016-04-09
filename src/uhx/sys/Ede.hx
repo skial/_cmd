@@ -66,6 +66,18 @@ class Ede {
 				
 		}
 		
+		function displayName(metas:Metadata, def:String):String {
+			var result = def;
+			var natives = metas.filter( function(m) return m.name == ':native' && m.params.length > 0 );
+			
+			if (natives.length > 0) switch (natives[0].params[0].expr) {
+				case EConst(CString(v)): result = v;
+				case _:
+			}
+			
+			return result;
+		}
+		
 		function extendsCommand(parent:ClassType):Bool {
 			var result = false;
 			
@@ -120,7 +132,8 @@ class Ede {
 			
 			switch (field.kind) {
 				case FVar(t, e), FProp(_, _, t, e):
-					var aliases = [macro $v { field.name } ];
+					var name = displayName( field.meta, field.name );
+					var aliases = [macro $v { name } ];
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
@@ -154,7 +167,7 @@ class Ede {
 					} else if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
 					} else {
-						macro (_map.get( $v { field.name } )[0]:String);
+						macro (_map.get( $v { name } )[0]:String);
 					}
 					
 					// Bool values do not require a value eg `cmd -v` means v is true.
@@ -179,7 +192,7 @@ class Ede {
 										break;
 									}
 								} 
-							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { field.name } ) > -1) {
+							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { name } ) > -1) {
 								$p{['this', field.name]} = $e;
 							}
 							
@@ -191,7 +204,7 @@ class Ede {
 										break;
 									}
 								} 
-							: macro if (_map.exists( $v { field.name } )) {
+							: macro if (_map.exists( $v { name } )) {
 								$p{['this', field.name]} = $e;
 							}
 							
@@ -267,7 +280,7 @@ class Ede {
 		
 		function hasSkipCmd(m:Null<Metadata>):Bool {
 			//trace( m.map(function(mm) return mm.name ) );
-			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter(function(p) return p.expr.match(EConst(CIdent('cmd')))).length > -1) n];
+			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter( function(p) return p.expr.match(EConst(CIdent('cmd'))) ).length > -1) n];
 			return filtered.length > 0;
 		}
 		// Get all doc info.
@@ -276,7 +289,7 @@ class Ede {
 		function processParents(parent:ClassType) {
 			if (parent.superClass != null) processParents( parent.superClass.t.get() );
 			
-			for (field in parent.fields.get()) if (field.isPublic && field.name != 'help') {
+			for (field in parent.fields.get()) if (field.isPublic && field.name != 'help' && !hasSkipCmd(field.meta.get())) {
 				checks.push( { doc:field.doc, meta:field.meta.get(), name:field.name } );
 				
 			}
@@ -325,7 +338,7 @@ class Ede {
 				var aliases = check.meta.filter( function(m) return m.name == 'alias' );
 				var isSubcommand = check.meta.filter( function(m) return m.name == ':subcommand' ).length > 0;
 				
-				part = (!isSubcommand?'--':'') + '${check.name}\t$part';
+				part = (!isSubcommand?'--':'') + '${displayName(check.meta, check.name)}\t$part';
 				
 				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					

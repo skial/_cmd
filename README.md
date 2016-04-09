@@ -154,6 +154,11 @@ Add `@alias('v')` to your field to provide an alternative _short form_ name.
 Add `@:skip(cmd)` to your public fields for which you don't want Ede to include
 in the auto-generated `help` message.
 
+##### `@:native('value')`
+
+Add `@:native('value')` to your field to match against `value` instead of the
+variables/methods original name.
+
 #### Expression level metadata
 
 ##### `@:cmd _` and `@:cmd !_`
