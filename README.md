@@ -160,6 +160,7 @@ in the auto-generated `help` message.
 
 - Without `@:cmd`, by default, `edeProcessArgs` is inserted at the top of your constructor.
 - Use `@:cmd _` to specify the exact point `edeProcessArgs` should be inserted.
+
 	```Haxe
 	public function new(args:Array<String>) {
 		var a = 'foo';
@@ -169,6 +170,7 @@ in the auto-generated `help` message.
 	}
 	``` 
 - Use `@:cmd !_` to tell Ede **not** to insert `edeProcessArgs` at all.
+	
 	```Haxe
 	public function new(args:Array<String>) {
 		var a = 'foo';
