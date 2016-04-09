@@ -84,8 +84,8 @@ class Main {
 
 Ede will add an instance method to your class, named `edeProcessArgs`, that takes
 a single argument of type `Array<String>`. By default, `edeProcessArgs` is inserted
-at the top of your constructor, before all over code. See details for `@:cmd _` below
-to control where `edeProcessArgs` is inserted.
+at the top of your constructor, before all other code. See details for 
+[`@:cmd _`](#cmd-_-and-cmd-_) to control where `edeProcessArgs` is inserted.
 
 ### Auto Help
 
@@ -137,7 +137,7 @@ information, which gets included in the auto-generated `help` method, built
 by Ede.
 
 If the `@:usage` string includes the word `haxelib`, Ede will act as if
-`-D haxelib` was defined in your `hxml` file.
+[`-D haxelib`](#hxml-defines) was defined in your `hxml` file.
 
 #### Field level metadata
 
