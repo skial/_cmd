@@ -3,6 +3,10 @@ Cmd
 
 A set of classes which help create command line applications.
 
+## Prerequisite
+
+- [jete](https://github.com/skial/jete)
+
 ## Install
 
 `haxelib git cmd https://github.com/skial/cmd.git`

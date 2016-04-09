@@ -55,13 +55,6 @@ class Ede {
 			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
 				Context.error( 'Field `new` must have a parameter named `args` of type `Array<String>`', _new.pos );
 				
-			/*case FFun( { args:args } ):
-				for (arg in args) if (arg.name == 'args') {
-					isSubcommand = Context.unify(arg.type.toType(), (macro:haxe.ds.StringMap<Array<Dynamic>>).toType());
-					if (isSubcommand) break;
-					
-				}*/
-				
 			case _:
 				
 		}
@@ -91,6 +84,7 @@ class Ede {
 			
 			return result;
 		}
+		
 		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
 		var helpAccess = [APublic];
 		if (inheritsCommand) helpAccess.push( AOverride );
@@ -146,13 +140,10 @@ class Ede {
 							
 						}
 						var tp = resolveTPath(t);
-						
 						var res = if (e != null) {
-							//macro $e(_map);
 							macro $e(args);
 							
 						} else {
-							//macro new $tp(_map);
 							macro new $tp(args);
 							
 						}
@@ -166,11 +157,13 @@ class Ede {
 						res;
 					} else if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
+						
 					} else {
 						macro (_map.get( $v { name } )[0]:String);
+						
 					}
 					
-					// Bool values do not require a value eg `cmd -v` means v is true.
+					// Bool values do not require a value, eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
 							macro cast _map.get( name );
