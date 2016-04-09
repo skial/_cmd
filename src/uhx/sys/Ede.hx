@@ -55,12 +55,12 @@ class Ede {
 			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
 				Context.error( 'Field `new` must have a parameter named `args` of type `Array<String>`', _new.pos );
 				
-			case FFun( { args:args } ):
+			/*case FFun( { args:args } ):
 				for (arg in args) if (arg.name == 'args') {
 					isSubcommand = Context.unify(arg.type.toType(), (macro:haxe.ds.StringMap<Array<Dynamic>>).toType());
 					if (isSubcommand) break;
 					
-				}
+				}*/
 				
 			case _:
 				
@@ -93,8 +93,25 @@ class Ede {
 			} ),
 			pos: Context.currentPos(),
 			doc: 'Show this message.',
-				meta: [ { name:'alias', params:[macro 'h', macro '?'], pos:Context.currentPos() } ],
+			meta: [ { name:'alias', params:[macro 'h', macro '?'], pos:Context.currentPos() } ],
 		} );
+		
+		var edeProcessArgsAccess = [APrivate];
+		if (inheritsCommand) edeProcessArgsAccess.push( AOverride );
+		
+		var edeProcessArgsBody = {
+			args: [{ name:'args', type:macro:Array<String> }],
+			ret: null,
+			expr: macro { }
+		};
+		var edeProcessArgsField = {
+			name:'edeProcessArgs',
+			access: edeProcessArgsAccess,
+			kind: FFun( edeProcessArgsBody ),
+			pos: Context.currentPos(),
+			doc: 'Show this message.',
+			meta: [ { name:':skip', params:[], pos:Context.currentPos() } ],
+		}
 		
 		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
@@ -118,10 +135,12 @@ class Ede {
 						var tp = resolveTPath(t);
 						
 						var res = if (e != null) {
-							macro $e(_map);
+							//macro $e(_map);
+							macro $e(args);
 							
 						} else {
-							macro new $tp(_map);
+							//macro new $tp(_map);
+							macro new $tp(args);
 							
 						}
 						
@@ -247,6 +266,7 @@ class Ede {
 		}
 		
 		function hasSkipCmd(m:Null<Metadata>):Bool {
+			//trace( m.map(function(mm) return mm.name ) );
 			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter(function(p) return p.expr.match(EConst(CIdent('cmd')))).length > -1) n];
 			return filtered.length > 0;
 		}
@@ -361,36 +381,45 @@ class Ede {
 		var block = macro @:mergeBlock $b { typecasts };
 		
 		// Expressions to be put before everything else already in the constructor.
-		if (!isSubcommand) {
+		//if (!isSubcommand) {
 			nexprs.push( macro @:mergeBlock {
-				var _argCopy = args.copy();
+				var _argCopy:Array<String> = args.copy();
 				#if haxelib
 				$haxelib;
 				#end
 				var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
-				var _map = _cmd.parse();
+				var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
 				$block;
 			} );
 			
-		} else {
+		/*} else {
 			nexprs.push( macro @:mergeBlock {
 				#if haxelib
 				$haxelib;
 				#end
-				var _map = args;
+				var _map:haxe.ds.StringMap<Array<Dynamic>> = args;
 				$block;
 			} );
 			
-		}
+		}*/
+		
+		edeProcessArgsBody.expr = macro $b { nexprs };
+		fields.push( edeProcessArgsField );
 		
 		switch (_new.kind) {
 			case FFun(m):
+				var include = true;
 				var index = -1;
 				var exprs = [];
 				switch (m.expr.expr) {
 					case EBlock(es):
 						exprs = es;
 						for (i in 0...es.length) switch (es[i]) {
+							case { expr:EMeta( { name:':cmd' }, macro !_) } :
+								index = i;
+								include = false;
+								break;
+								
 							case { expr:EMeta( { name:':cmd' }, _) } :
 								index = i;
 								break;
@@ -402,12 +431,20 @@ class Ede {
 					case _:
 						
 				}
-				if (index == -1) {
-					m.expr = macro $b { nexprs.concat(exprs) };
-				} else {
-					m.expr = macro $b { exprs.slice(0, index).concat( nexprs ).concat( exprs.slice(index + 1) ) };
-				}
 				
+				if (!include) {
+					m.expr = macro $b { exprs.slice(0, index).concat( exprs.slice(index + 1) ) };
+					
+				} else {
+					if (index == -1) {
+						//m.expr = macro $b { nexprs.concat(exprs) };
+						m.expr = macro edeProcessArgs( args );
+					} else {
+						//m.expr = macro $b { exprs.slice(0, index).concat( nexprs ).concat( exprs.slice(index + 1) ) };
+						m.expr = macro $b { exprs.slice(0, index).concat( [macro edeProcessArgs( args )] ).concat( exprs.slice(index + 1) ) };
+					}
+					
+				}
 			case _:
 				
 				
