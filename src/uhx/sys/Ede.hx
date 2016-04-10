@@ -15,6 +15,7 @@ import uhx.macro.KlasImp;
 using Lambda;
 using StringTools;
 using haxe.macro.Tools;
+using haxe.macro.Context;
 
 /**
  * ...
@@ -386,28 +387,15 @@ class Ede {
 		// Turn all the expressions in `typecasts` into a block of code.
 		var block = macro @:mergeBlock $b { typecasts };
 		
-		// Expressions to be put before everything else already in the constructor.
-		//if (!isSubcommand) {
-			nexprs.push( macro @:mergeBlock {
-				var _argCopy:Array<String> = args.copy();
-				#if haxelib
-				$haxelib;
-				#end
-				var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
-				var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
-				$block;
-			} );
-			
-		/*} else {
-			nexprs.push( macro @:mergeBlock {
-				#if haxelib
-				$haxelib;
-				#end
-				var _map:haxe.ds.StringMap<Array<Dynamic>> = args;
-				$block;
-			} );
-			
-		}*/
+		nexprs.push( macro @:mergeBlock {
+			var _argCopy:Array<String> = args.copy();
+			#if haxelib
+			$haxelib;
+			#end
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
+			$block;
+		} );
 		
 		edeProcessArgsBody.expr = macro $b { nexprs };
 		fields.push( edeProcessArgsField );
@@ -443,10 +431,8 @@ class Ede {
 					
 				} else {
 					if (index == -1) {
-						//m.expr = macro $b { nexprs.concat(exprs) };
 						m.expr = macro edeProcessArgs( args );
 					} else {
-						//m.expr = macro $b { exprs.slice(0, index).concat( nexprs ).concat( exprs.slice(index + 1) ) };
 						m.expr = macro $b { exprs.slice(0, index).concat( [macro edeProcessArgs( args )] ).concat( exprs.slice(index + 1) ) };
 					}
 					
@@ -456,7 +442,12 @@ class Ede {
 				
 		}
 		
-		//trace( cls.name, [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+		if ('debug'.defined() && 'cmd-verbose'.defined()) {
+			trace( cls.name );
+			trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+			
+		}
+		
 		return fields;
 	}
 	

@@ -191,9 +191,17 @@ variables/methods original name.
 
 ### Hxml Defines
 
-If you're using the build macro `Ede` and are building a haxelib `run` command,
-add `-D haxelib` to your `hxml` file so Ede removes the directory that haxelib
-adds as a last argument.
+#### `-D haxelib`
+
+If you're using `Ede` to build a haxelib `run` command, adding `-D haxelib` to your
+`hxml` file will tell Ede to insert code into `edeProcessArgs` to prevent cmd
+from processing the last argument which the haxelib client adds automatically
+when calling `haxelib run mylib`.
+
+#### `-D debug` && `-D cmd-verbose`
+
+These two defines together help with debugging by printing out to terminal
+the modified contents of your classes that cmd touches.
 
 ## Tests
 
