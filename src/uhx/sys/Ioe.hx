@@ -49,7 +49,7 @@ class Ioe {
 		content = content.trim();
 	}
 	
-	public function prompt(value:String, options:Map<Array<String>, Bool>):Bool {
+	private function prompt(value:String, options:Map<Array<String>, Bool>):Bool {
 		var result = false;
 		var response = '';
 		

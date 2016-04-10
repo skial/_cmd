@@ -1,5 +1,6 @@
 package uhx.sys;
 
+import haxe.ds.ArraySort;
 import haxe.macro.ComplexTypeTools;
 import haxe.macro.Printer;
 import haxe.macro.Type;
@@ -14,6 +15,7 @@ import uhx.macro.KlasImp;
 using Lambda;
 using StringTools;
 using haxe.macro.Tools;
+using haxe.macro.Context;
 
 /**
  * ...
@@ -54,21 +56,43 @@ class Ede {
 			case FFun( { args:args } ) if (args.filter( function(arg) return arg.name == 'args').length == 0):
 				Context.error( 'Field `new` must have a parameter named `args` of type `Array<String>`', _new.pos );
 				
-			case FFun( { args:args } ):
-				for (arg in args) if (arg.name == 'args') {
-					isSubcommand = Context.unify(arg.type.toType(), (macro:haxe.ds.StringMap<Array<Dynamic>>).toType());
-					if (isSubcommand) break;
-					
-				}
-				
 			case _:
 				
 		}
 		
+		function displayName(metas:Metadata, def:String):String {
+			var result = def;
+			var natives = metas.filter( function(m) return m.name == ':native' && m.params.length > 0 );
+			
+			if (natives.length > 0) switch (natives[0].params[0].expr) {
+				case EConst(CString(v)): result = v;
+				case _:
+			}
+			
+			return result;
+		}
+		
+		function extendsCommand(parent:ClassType):Bool {
+			var result = false;
+			
+			if (!parent.meta.has(':cmd') && parent.superClass != null) {
+				result = extendsCommand( parent.superClass.t.get() );
+				
+			} else {
+				result = parent.meta.has(':cmd');
+				
+			}
+			
+			return result;
+		}
+		
+		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
+		var helpAccess = [APublic];
+		if (inheritsCommand) helpAccess.push( AOverride );
 		// Add commandline help methods if they dont exist.
 		fields.push( {
 			name:'help',
-			access: [APublic],
+			access: helpAccess,
 			kind: FFun( {
 				args: [],
 				ret: null,
@@ -76,8 +100,25 @@ class Ede {
 			} ),
 			pos: Context.currentPos(),
 			doc: 'Show this message.',
-				meta: [ { name:'alias', params:[macro 'h', macro '?'], pos:Context.currentPos() } ],
+			meta: [ { name:'alias', params:[macro 'h', macro '?'], pos:Context.currentPos() } ],
 		} );
+		
+		var edeProcessArgsAccess = [APrivate];
+		if (inheritsCommand) edeProcessArgsAccess.push( AOverride );
+		
+		var edeProcessArgsBody = {
+			args: [{ name:'args', type:macro:Array<String> }],
+			ret: null,
+			expr: macro { }
+		};
+		var edeProcessArgsField = {
+			name:'edeProcessArgs',
+			access: edeProcessArgsAccess,
+			kind: FFun( edeProcessArgsBody ),
+			pos: Context.currentPos(),
+			doc: 'Show this message.',
+			meta: [ { name:':skip', params:[], pos:Context.currentPos() } ],
+		}
 		
 		// An array of expressions which cast the argument to the fields type.
 		var typecasts:Array<Expr> = [];
@@ -86,7 +127,8 @@ class Ede {
 			
 			switch (field.kind) {
 				case FVar(t, e), FProp(_, _, t, e):
-					var aliases = [macro $v { field.name } ];
+					var name = displayName( field.meta, field.name );
+					var aliases = [macro $v { name } ];
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
@@ -99,12 +141,11 @@ class Ede {
 							
 						}
 						var tp = resolveTPath(t);
-						
 						var res = if (e != null) {
-							macro $e(_map);
+							macro $e(args);
 							
 						} else {
-							macro new $tp(_map);
+							macro new $tp(args);
 							
 						}
 						
@@ -117,11 +158,13 @@ class Ede {
 						res;
 					} else if (aliases.length > 1) {
 						macro (_map.get( name )[0]:String);
+						
 					} else {
-						macro (_map.get( $v { field.name } )[0]:String);
+						macro (_map.get( $v { name } )[0]:String);
+						
 					}
 					
-					// Bool values do not require a value eg `cmd -v` means v is true.
+					// Bool values do not require a value, eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
 							macro cast _map.get( name );
@@ -143,7 +186,7 @@ class Ede {
 										break;
 									}
 								} 
-							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { field.name } ) > -1) {
+							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { name } ) > -1) {
 								$p{['this', field.name]} = $e;
 							}
 							
@@ -155,7 +198,7 @@ class Ede {
 										break;
 									}
 								} 
-							: macro if (_map.exists( $v { field.name } )) {
+							: macro if (_map.exists( $v { name } )) {
 								$p{['this', field.name]} = $e;
 							}
 							
@@ -230,15 +273,35 @@ class Ede {
 		}
 		
 		function hasSkipCmd(m:Null<Metadata>):Bool {
-			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter(function(p) return p.expr.match(EConst(CIdent('cmd')))).length > -1) n];
+			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter( function(p) return p.expr.match(EConst(CIdent('cmd'))) ).length > -1) n];
 			return filtered.length > 0;
 		}
 		// Get all doc info.
-		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [ 
-			for (f in fields) 
+		var checks:Array<{doc:Null<String>, meta:Metadata, name:String}> = [];
+		
+		function processParents(parent:ClassType) {
+			if (parent.superClass != null) processParents( parent.superClass.t.get() );
+			
+			for (field in parent.fields.get()) if (field.isPublic && field.name != 'help' && !hasSkipCmd(field.meta.get())) {
+				checks.push( { doc:field.doc, meta:field.meta.get(), name:field.name } );
+				
+			}
+			
+		}
+		
+		if (cls.superClass != null) processParents( cls.superClass.t.get() );
+		
+		checks = checks.concat( [for (f in fields) 
 				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new'  && !hasSkipCmd(f.meta)) 
 					f 
-		];
+		] );
+		
+		ArraySort.sort(checks, function(a, b) {
+			var c = [for (m in a.meta) if (m.name == ':subcommand') m].length;
+			var d = [for (m in b.meta) if (m.name == ':subcommand') m].length;
+			return c > 0 && d > 0 ? 0 : c > 0 ? -1 : 1;
+		});
+		
 		checks.unshift( cast cls );
 		
 		var docs:Array<String> = [];
@@ -268,7 +331,7 @@ class Ede {
 				var aliases = check.meta.filter( function(m) return m.name == 'alias' );
 				var isSubcommand = check.meta.filter( function(m) return m.name == ':subcommand' ).length > 0;
 				
-				part = (!isSubcommand?'--':'') + '${check.name}\t$part';
+				part = (!isSubcommand?'--':'') + '${displayName(check.meta, check.name)}\t$part';
 				
 				if (aliases != null) for (alias in aliases) for(param in alias.params) {
 					
@@ -323,37 +386,33 @@ class Ede {
 		// Turn all the expressions in `typecasts` into a block of code.
 		var block = macro @:mergeBlock $b { typecasts };
 		
-		// Expressions to be put before everything else already in the constructor.
-		if (!isSubcommand) {
-			nexprs.push( macro @:mergeBlock {
-				var _argCopy = args.copy();
-				#if haxelib
-				$haxelib;
-				#end
-				var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
-				var _map = _cmd.parse();
-				$block;
-			} );
-			
-		} else {
-			nexprs.push( macro @:mergeBlock {
-				#if haxelib
-				$haxelib;
-				#end
-				var _map = args;
-				$block;
-			} );
-			
-		}
+		nexprs.push( macro @:mergeBlock {
+			var _argCopy:Array<String> = args.copy();
+			#if haxelib
+			$haxelib;
+			#end
+			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
+			$block;
+		} );
+		
+		edeProcessArgsBody.expr = macro $b { nexprs };
+		fields.push( edeProcessArgsField );
 		
 		switch (_new.kind) {
 			case FFun(m):
+				var include = true;
 				var index = -1;
 				var exprs = [];
 				switch (m.expr.expr) {
 					case EBlock(es):
 						exprs = es;
 						for (i in 0...es.length) switch (es[i]) {
+							case { expr:EMeta( { name:':cmd' }, macro !_) } :
+								index = i;
+								include = false;
+								break;
+								
 							case { expr:EMeta( { name:':cmd' }, _) } :
 								index = i;
 								break;
@@ -365,18 +424,29 @@ class Ede {
 					case _:
 						
 				}
-				if (index == -1) {
-					m.expr = macro $b { nexprs.concat(exprs) };
-				} else {
-					m.expr = macro $b { exprs.slice(0, index).concat( nexprs ).concat( exprs.slice(index + 1) ) };
-				}
 				
+				if (!include) {
+					m.expr = macro $b { exprs.slice(0, index).concat( exprs.slice(index + 1) ) };
+					
+				} else {
+					if (index == -1) {
+						m.expr = macro edeProcessArgs( args );
+					} else {
+						m.expr = macro $b { exprs.slice(0, index).concat( [macro edeProcessArgs( args )] ).concat( exprs.slice(index + 1) ) };
+					}
+					
+				}
 			case _:
 				
 				
 		}
 		
-		//trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+		if ('debug'.defined() && 'cmd-verbose'.defined()) {
+			trace( cls.name );
+			trace( [for (f in fields) KlasImp.printer.printField( f )].join('\n') );
+			
+		}
+		
 		return fields;
 	}
 	

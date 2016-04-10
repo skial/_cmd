@@ -3,6 +3,10 @@ Cmd
 
 A set of classes which help create command line applications.
 
+## Prerequisite
+
+- [jete](https://github.com/skial/jete)
+
 ## Install
 
 `haxelib git cmd https://github.com/skial/cmd.git`
@@ -80,20 +84,30 @@ class Main {
 
 ## Details
 
-### Auto Documenting
+### `edeProcessArgs`
 
-Ede will use your field code comments to populate the auto-generated `help`
-message.
+Ede will add an instance method to your class, named `edeProcessArgs`, that takes
+a single argument of type `Array<String>`. By default, `edeProcessArgs` is inserted
+at the top of your constructor, before all other code. See details for 
+[`@:cmd _`](#cmd-_-and-cmd-_) to control where `edeProcessArgs` is inserted.
+
+### Auto Help
+
+Ede will use your code comments to populate the auto-generated `help`
+message. The auto-generated `help` method, has the following two
+aliases, `-?` and `-h`. Ede builds the message passed on:
+
+ - Your public fields documentation.
+ - Your public fields names and their aliases.
 
 ### Subcommands
 
-To create a subcommand, create a class whose constructor accepts a `args:StringMap<Array<Dynamic>>`,
-usually as its first argument. The subcommand class must also have the `@:cmd` metadata.
+A subcommand is just a normal class marked with `@:cmd`.
 
  - Subcommands are dashless in both their long and short forms, _i.e_, they don't start with either `--` or `-`.
  - Ede will only process a subcommand if it's the first argument passed in.
   + This will work: `mytool sub -a 1 -b 2 -c 3`.
-  + This **won't** work: `mytool -a 1 sub -b 2 -c 3`, _because `Lod` which parses the arguments_, reads `-a 1 sub` as `-a` having two values, `['1', 'sub']`.
+  + This **won't** work: `mytool -a 1 sub -b 2 -c 3`, _because `Lod`, which parses the arguments_, reads `-a 1 sub` as `-a` having two values, `['1', 'sub']`.
  - Ede will pass all arguments to your subcommand to process.
 
 If your subcommand class takes more than one argument, your
@@ -102,39 +116,36 @@ provide Ede with a _template_ expression to work with.
 
 A simple example is `public var sub:Class = Class.new.bind(_, 'value', 256, var1, var2);`.
 
-- The underscore, `_`, is the position of the `args:StringMap<Array<Dynamic>>` argument.
+- The underscore, `_`, is the position of the `args:Array<String>` argument.
 - `'value'` and `256` are constant values.
-- `var1` and `var2` are variables and **must** be accessible from the constructor, if not, you will get compiler errors.
+- `var1` and `var2` are variables and **must** be accessible from `edeProcessArgs`, if not, you will get compiler errors.
 
-Ede will remove the _template_ expression, `Class.new.bind(_, 'value', 256, var1, var);`, as it will cause a compiler error
-if its not removed. Ede uses this _template_ expression
-instead of the default `new Class(_map)` expression it would 
+Ede will remove the _template_ expression, `Class.new.bind(_, 'value', 256, var1, var);`, as it would cause a compiler error
+if not removed. Ede uses this _template_ expression
+instead of the default `new Class(args)` expression it would 
 normally use.
-
-*Sidenote: `_map` is an internal variable created by Ede, used while processing command arguments.*
-
-### Auto Help
-
-Ede auto-generates a `help` method, with the following two
-aliases, `-?` and `-h`. Ede builds the message passed on:
-
- - Your public fields documentation.
- - Your public fields names and their aliases.
 
 ### Available Metadata
 
-#### `@:cmd`
+#### Class level metadata
 
-Add `@:cmd` to your class to tell Ede to help turn the class into a
+##### `@:cmd`
+
+Add `@:cmd` to your class to tell Ede to turn the class into a
 command line application.
 
-#### `@:usage`
+##### `@:usage`
 
 Add `@:usage('tool --output ./bin --process *.jpg')` to provide detailed
 information, which gets included in the auto-generated `help` method, built
 by Ede.
 
-#### `@alias`
+If the `@:usage` string includes the word `haxelib`, Ede will act as if
+[`-D haxelib`](#hxml-defines) was defined in your `hxml` file.
+
+#### Field level metadata
+
+##### `@alias`
 
 Add `@alias('v')` to your field to provide an alternative _short form_ name.
 
@@ -142,23 +153,55 @@ Add `@alias('v')` to your field to provide an alternative _short form_ name.
 - You can define multiple values, e.g, `@alias('a','b', 'c')`.
 - The alias can be any length, e.g, `@alias('supercalifragilisticexpialidocious')`
 
-#### `@:cmd _`
-
-Add the `@:cmd _` meta expression into your constructor body to control
-the insertion point Ede will place the command line argument processing.
-By default, Ede will place it before all other code in your constructor.
-
-#### `@:skip(cmd)`
+##### `@:skip(cmd)`
 
 Add `@:skip(cmd)` to your public fields for which you don't want Ede to include
 in the auto-generated `help` message.
 
+##### `@:native('value')`
+
+Add `@:native('value')` to your field to match against `value` instead of the
+variables/methods original name.
+
+#### Expression level metadata
+
+##### `@:cmd _` and `@:cmd !_`
+
+- Without `@:cmd`, by default, `edeProcessArgs` is inserted at the top of your constructor.
+- Use `@:cmd _` to specify the exact point `edeProcessArgs` should be inserted.
+
+	```Haxe
+	public function new(args:Array<String>) {
+		var a = 'foo';
+		var b = 100;
+		@:cmd _;	//	`edeProcessArgs( args )` will be inserted at this point.
+		var c = '$a$b';
+	}
+	``` 
+- Use `@:cmd !_` to tell Ede **not** to insert `edeProcessArgs` at all.
+	
+	```Haxe
+	public function new(args:Array<String>) {
+		var a = 'foo';
+		var b = 100;
+		@:cmd !_;	//	`edeProcessArgs` will not be inserted into the constructor at all.
+		var c = '$a$b';
+	}
+	``` 
 
 ### Hxml Defines
 
-If you're using the build macro `Ede` and are building a haxelib `run` command,
-add `-D haxelib` to your `hxml` file so Ede removes the directory that haxelib
-adds as a last argument.
+#### `-D haxelib`
+
+If you're using `Ede` to build a haxelib `run` command, adding `-D haxelib` to your
+`hxml` file will tell Ede to insert code into `edeProcessArgs` to prevent cmd
+from processing the last argument which the haxelib client adds automatically
+when calling `haxelib run mylib`.
+
+#### `-D debug` && `-D cmd-verbose`
+
+These two defines together help with debugging by printing out to terminal
+the modified contents of your classes that cmd touches.
 
 ## Tests
 
