@@ -86,6 +86,22 @@ class Ede {
 			return result;
 		}
 		
+		function superAliases(parent:ClassType, name:String):Array<Expr> {
+			var results = [];
+			
+			for (field in parent.fields.get()) if (field.name == name) {
+				for (m in field.meta.get()) if (m.name == 'alias') {
+					results = results.concat( m.params );
+					
+				}
+				
+			}
+			
+			if (parent.superClass != null) results = results.concat( superAliases( parent.superClass.t.get(), name ) );
+			
+			return results;
+		}
+		
 		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
 		var helpAccess = [APublic];
 		if (inheritsCommand) helpAccess.push( AOverride );
@@ -129,7 +145,10 @@ class Ede {
 				case FVar(t, e), FProp(_, _, t, e):
 					var name = displayName( field.meta, field.name );
 					var aliases = [macro $v { name } ];
+					var isFieldOverride = field.access.indexOf( AOverride ) > -1;
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
+					
+					if (cls.superClass != null && isFieldOverride) aliases = aliases.concat( superAliases( cls.superClass.t.get(), field.name ) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
 					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
@@ -219,7 +238,28 @@ class Ede {
 						if (optional.length > 0) field.meta.push( { name:'optional_arity', pos:field.pos, params:[macro $v { optional.length } ] } );
 						
 						var aliases = [macro $v { field.name } ];
+						var isFieldOverride = field.access.indexOf( AOverride ) > -1;
 						for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
+						if (cls.superClass != null && isFieldOverride) {
+							var inheritedAliases = superAliases( cls.superClass.t.get(), field.name );
+							// Add `inheritedAliases` names to new field
+							if (field.meta.filter( function(m) return m.name == 'alias' ).length == 0) {
+								field.meta.push( { name:'alias', params:inheritedAliases, pos:field.pos } );
+								
+							} else {
+								var alias = field.meta.filter( function(m) return m.name == 'alias' )[0];
+								var printed = alias.params.map( KlasImp.printer.printExpr );
+								
+								for (inheritedAlias in inheritedAliases) if (printed.indexOf( KlasImp.printer.printExpr( inheritedAlias ) ) == -1) {
+										alias.params.push( inheritedAlias );
+									
+								}
+								
+							}
+							
+							aliases = aliases.concat( inheritedAliases );
+							
+						}
 						
 						var argcasts:Array<Expr> = [];
 						
@@ -288,8 +328,13 @@ class Ede {
 			}
 			
 		}
-		
+				
 		if (cls.superClass != null) processParents( cls.superClass.t.get() );
+		
+		// This removes fields that have been overriden.
+		for (field in fields) for (i in 0...checks.length) {
+			if (checks[i].name == field.name) checks.remove( checks[i] );
+		}
 		
 		checks = checks.concat( [for (f in fields) 
 				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new'  && !hasSkipCmd(f.meta)) 
