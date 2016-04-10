@@ -273,7 +273,6 @@ class Ede {
 		}
 		
 		function hasSkipCmd(m:Null<Metadata>):Bool {
-			//trace( m.map(function(mm) return mm.name ) );
 			var filtered = [for (n in m) if (n.name == ':skip' && n.params.filter( function(p) return p.expr.match(EConst(CIdent('cmd'))) ).length > -1) n];
 			return filtered.length > 0;
 		}
