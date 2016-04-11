@@ -472,10 +472,6 @@ class Ede {
 			$e{ (inheritsCommand) ? macro super.edeProcessArgs( _argCopy ) : macro @:mergeBlock {} };
 		} );
 		
-		/*if (inheritsCommand) nexprs.push( macro @:mergeBlock {
-			super.edeProcessArgs( _argCopy );
-		} );*/
-		
 		edeProcessArgsBody.expr = macro $b { nexprs };
 		fields.push( edeProcessArgsField );
 		
