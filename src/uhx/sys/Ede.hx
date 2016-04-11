@@ -102,6 +102,27 @@ class Ede {
 			return results;
 		}
 		
+		function aliasRemoval(aliases:Array<Expr>, ?isFieldOverride:Bool = false):Expr {
+			var mapped = [];
+			for (i in 0...aliases.length) {
+				if (i == 0) { 
+					mapped.push( macro '--' + $e{aliases[i]} );
+					
+				} else {
+					mapped.push( macro '-' + $e{aliases[i]} );
+					
+				}
+				
+			}
+			
+			return if (isFieldOverride) {
+				macro for (alias in $a{mapped}) _argCopy.remove(alias);
+				
+			} else {
+				macro @:mergeBlock {};
+			}
+		}
+		
 		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
 		var helpAccess = [APublic];
 		if (inheritsCommand) helpAccess.push( AOverride );
@@ -294,12 +315,16 @@ class Ede {
 						
 						typecasts.push(
 							if (aliases.length == 1) {
-								macro if (_map.exists( $e { aliases[0] } )) $e { block(aliases[0]) };
+								macro if (_map.exists( $e { aliases[0] } )) {
+									$e { block(aliases[0]) };
+									$e { aliasRemoval(aliases, isFieldOverride) };
+								}
 								
 							} else {
 								macro for (name in [$a { aliases } ]) {
 									if (_map.exists( name )) {
 										$e { block(macro name) };
+										$e { aliasRemoval(aliases, isFieldOverride) };
 										break;
 									}
 								}
@@ -431,6 +456,11 @@ class Ede {
 		// Turn all the expressions in `typecasts` into a block of code.
 		var block = macro @:mergeBlock $b { typecasts };
 		
+		if ('debug'.defined() && 'cmd-verbose'.defined()) {
+			nexprs.push( macro trace( 'Input arguments for ' + $v{cls.pack.toDotPath(cls.name)} + ' => ' + args ) );
+			
+		}
+		
 		nexprs.push( macro @:mergeBlock {
 			var _argCopy:Array<String> = args.copy();
 			#if haxelib
@@ -439,7 +469,12 @@ class Ede {
 			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
 			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
 			$block;
+			$e{ (inheritsCommand) ? macro super.edeProcessArgs( _argCopy ) : macro @:mergeBlock {} };
 		} );
+		
+		/*if (inheritsCommand) nexprs.push( macro @:mergeBlock {
+			super.edeProcessArgs( _argCopy );
+		} );*/
 		
 		edeProcessArgsBody.expr = macro $b { nexprs };
 		fields.push( edeProcessArgsField );
