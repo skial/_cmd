@@ -89,14 +89,14 @@ class Lod {
 				if (arg.startsWith( '--' )) {
 					
 					// Option eg `--foo`
-					arg = arg.replace( '-', '' );
+					arg = arg.substring( 2 );
 					pre = Option( false, arg );
 					set( arg, [] );
 					
 				} else if (arg.startsWith( '-' )) {
 					
 					// Short hand option eg `-f`
-					arg = arg.replace( '-', '' );
+					arg = arg.substring( 1 );
 					pre = Option( true, arg);
 					set( arg, [] );
 					

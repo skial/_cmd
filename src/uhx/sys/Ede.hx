@@ -1,5 +1,6 @@
 package uhx.sys;
 
+#if macro
 import haxe.ds.ArraySort;
 import haxe.macro.ComplexTypeTools;
 import haxe.macro.Printer;
@@ -16,6 +17,7 @@ using Lambda;
 using StringTools;
 using haxe.macro.Tools;
 using haxe.macro.Context;
+#end
 
 /**
  * ...
@@ -23,6 +25,27 @@ using haxe.macro.Context;
  * ede => Help in Haitian Creole 
  */
 class Ede {
+	
+	#if !macro
+	public static function argumentFilter(args:Array<String>, filter:Array<String>):Array<String> {
+		var skip:Bool = false;
+		return [for (arg in args) {
+			if (skip && StringTools.startsWith( arg, '-' )) {
+				skip = false;
+				arg;
+				
+			} else if (filter.indexOf( arg ) == -1) {
+				arg;
+				
+			} else {
+				skip = true;
+				continue;
+				
+			}
+		}];
+	}
+	
+	#else
 	
 	public static macro function initialize():Void {
 		try {
@@ -106,17 +129,23 @@ class Ede {
 			var mapped = [];
 			for (i in 0...aliases.length) {
 				if (i == 0) { 
-					mapped.push( macro '--' + $e{aliases[i]} );
+					mapped.push( switch (aliases[i].expr) {
+						case EConst(CString(v)): macro $v{'--$v'};
+						case _: aliases[i];
+					} );
 					
 				} else {
-					mapped.push( macro '-' + $e{aliases[i]} );
+					mapped.push( switch (aliases[i].expr) {
+						case EConst(CString(v)): macro $v{'-$v'};
+						case _: aliases[i];
+					} );
 					
 				}
 				
 			}
 			
 			return if (isFieldOverride) {
-				macro for (alias in $a{mapped}) _argCopy.remove(alias);
+				macro _argCopy = uhx.sys.Ede.argumentFilter( _argCopy, [$a{mapped}] );
 				
 			} else {
 				macro @:mergeBlock {};
@@ -525,5 +554,7 @@ class Ede {
 		
 		return fields;
 	}
+	
+	#end
 	
 }

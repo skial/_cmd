@@ -4,7 +4,6 @@ import haxe.rtti.Meta;
 import haxe.ds.StringMap;
 
 using Type;
-using Jwenn;
 using Reflect;
 
 /**
