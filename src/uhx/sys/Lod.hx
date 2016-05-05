@@ -35,7 +35,6 @@ class Lod {
 		var nargs:Array<String> = [];
 		
 		for (arg in args) {
-			
 			var sep = arg.indexOf( seperator );
 			
 			if (sep > -1) {
@@ -77,7 +76,6 @@ class Lod {
 	
 	private function process(args:Array<String>):StringMap<Array<Dynamic>> {
 		for (arg in args) {
-			
 			// Just dump all remaining args into `argv`
 			if (arg == '--') {
 				
@@ -89,14 +87,14 @@ class Lod {
 				if (arg.startsWith( '--' )) {
 					
 					// Option eg `--foo`
-					arg = arg.substring( arg.lastIndexOf('-') + 1 );
+					arg = ~/[-]+/.replace( arg, '' );
 					pre = Option( false, arg );
 					set( arg, [] );
 					
 				} else if (arg.startsWith( '-' )) {
 					
 					// Short hand option eg `-f`
-					arg = arg.substring( arg.lastIndexOf('-') + 1 );
+					arg = ~/[-]+/.replace( arg, '' );
 					pre = Option( true, arg);
 					set( arg, [] );
 					
