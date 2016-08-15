@@ -201,7 +201,14 @@ class Ede {
 					if (cls.superClass != null && isFieldOverride) aliases = aliases.concat( superAliases( cls.superClass.t.get(), field.name ) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
-					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
+					for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
+						aliases = aliases.concat( m.params );
+						
+					} else  {
+						aliases.push( macro $v{ field.name.charAt(0) } );
+						m.params.push( macro $v{ field.name.charAt(0) } );
+						
+					}
 					
 					var e = if (isFieldSubcommand) {
 						function resolveTPath(t:ComplexType) return switch (t) {
@@ -233,11 +240,11 @@ class Ede {
 						
 					}
 					
-					// Bool values do not require a value, eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
 							macro cast _map.get( name );
 							
+						// Bool values do not require a value, eg `cmd -v` means v is true.
 						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
 							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
 							
@@ -289,7 +296,16 @@ class Ede {
 						
 						var aliases = [macro $v { field.name } ];
 						var isFieldOverride = field.access.indexOf( AOverride ) > -1;
-						for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
+						
+						for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
+							aliases = aliases.concat( m.params );
+							
+						} else  {
+							aliases.push( macro $v{ field.name.charAt(0) } );
+							m.params.push( macro $v{ field.name.charAt(0) } );
+							
+						}
+						
 						if (cls.superClass != null && isFieldOverride) {
 							var inheritedAliases = superAliases( cls.superClass.t.get(), field.name );
 							// Add `inheritedAliases` names to new field
