@@ -1,5 +1,6 @@
 package uhx.sys;
 
+#if macro
 import haxe.ds.ArraySort;
 import haxe.macro.ComplexTypeTools;
 import haxe.macro.Printer;
@@ -16,6 +17,7 @@ using Lambda;
 using StringTools;
 using haxe.macro.Tools;
 using haxe.macro.Context;
+#end
 
 /**
  * ...
@@ -23,6 +25,27 @@ using haxe.macro.Context;
  * ede => Help in Haitian Creole 
  */
 class Ede {
+	
+	#if !macro
+	public static function argumentFilter(args:Array<String>, filter:Array<String>):Array<String> {
+		var skip:Bool = false;
+		return [for (arg in args) {
+			if (skip && StringTools.startsWith( arg, '-' )) {
+				skip = false;
+				arg;
+				
+			} else if (filter.indexOf( arg ) == -1) {
+				arg;
+				
+			} else {
+				skip = true;
+				continue;
+				
+			}
+		}];
+	}
+	
+	#else
 	
 	public static macro function initialize():Void {
 		try {
@@ -86,6 +109,49 @@ class Ede {
 			return result;
 		}
 		
+		function superAliases(parent:ClassType, name:String):Array<Expr> {
+			var results = [];
+			
+			for (field in parent.fields.get()) if (field.name == name) {
+				for (m in field.meta.get()) if (m.name == 'alias') {
+					results = results.concat( m.params );
+					
+				}
+				
+			}
+			
+			if (parent.superClass != null) results = results.concat( superAliases( parent.superClass.t.get(), name ) );
+			
+			return results;
+		}
+		
+		function aliasRemoval(aliases:Array<Expr>, ?isFieldOverride:Bool = false):Expr {
+			var mapped = [];
+			for (i in 0...aliases.length) {
+				if (i == 0) { 
+					mapped.push( switch (aliases[i].expr) {
+						case EConst(CString(v)): macro $v{'--$v'};
+						case _: aliases[i];
+					} );
+					
+				} else {
+					mapped.push( switch (aliases[i].expr) {
+						case EConst(CString(v)): macro $v{'-$v'};
+						case _: aliases[i];
+					} );
+					
+				}
+				
+			}
+			
+			return if (isFieldOverride) {
+				macro _argCopy = uhx.sys.Ede.argumentFilter( _argCopy, [$a{mapped}] );
+				
+			} else {
+				macro @:mergeBlock {};
+			}
+		}
+		
 		var inheritsCommand:Bool = cls.superClass != null ? extendsCommand( cls.superClass.t.get() ) : false;
 		var helpAccess = [APublic];
 		if (inheritsCommand) helpAccess.push( AOverride );
@@ -129,10 +195,20 @@ class Ede {
 				case FVar(t, e), FProp(_, _, t, e):
 					var name = displayName( field.meta, field.name );
 					var aliases = [macro $v { name } ];
+					var isFieldOverride = field.access.indexOf( AOverride ) > -1;
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
+					
+					if (cls.superClass != null && isFieldOverride) aliases = aliases.concat( superAliases( cls.superClass.t.get(), field.name ) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
-					for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
+					for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
+						aliases = aliases.concat( m.params );
+						
+					} else  {
+						aliases.push( macro $v{ field.name.charAt(0) } );
+						m.params.push( macro $v{ field.name.charAt(0) } );
+						
+					}
 					
 					var e = if (isFieldSubcommand) {
 						function resolveTPath(t:ComplexType) return switch (t) {
@@ -164,11 +240,11 @@ class Ede {
 						
 					}
 					
-					// Bool values do not require a value, eg `cmd -v` means v is true.
 					e = switch (t) {
 						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
 							macro cast _map.get( name );
 							
+						// Bool values do not require a value, eg `cmd -v` means v is true.
 						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
 							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
 							
@@ -219,7 +295,37 @@ class Ede {
 						if (optional.length > 0) field.meta.push( { name:'optional_arity', pos:field.pos, params:[macro $v { optional.length } ] } );
 						
 						var aliases = [macro $v { field.name } ];
-						for (m in field.meta) if (m.name == 'alias') aliases = aliases.concat( m.params );
+						var isFieldOverride = field.access.indexOf( AOverride ) > -1;
+						
+						for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
+							aliases = aliases.concat( m.params );
+							
+						} else  {
+							aliases.push( macro $v{ field.name.charAt(0) } );
+							m.params.push( macro $v{ field.name.charAt(0) } );
+							
+						}
+						
+						if (cls.superClass != null && isFieldOverride) {
+							var inheritedAliases = superAliases( cls.superClass.t.get(), field.name );
+							// Add `inheritedAliases` names to new field
+							if (field.meta.filter( function(m) return m.name == 'alias' ).length == 0) {
+								field.meta.push( { name:'alias', params:inheritedAliases, pos:field.pos } );
+								
+							} else {
+								var alias = field.meta.filter( function(m) return m.name == 'alias' )[0];
+								var printed = alias.params.map( KlasImp.printer.printExpr );
+								
+								for (inheritedAlias in inheritedAliases) if (printed.indexOf( KlasImp.printer.printExpr( inheritedAlias ) ) == -1) {
+										alias.params.push( inheritedAlias );
+									
+								}
+								
+							}
+							
+							aliases = aliases.concat( inheritedAliases );
+							
+						}
 						
 						var argcasts:Array<Expr> = [];
 						
@@ -254,12 +360,16 @@ class Ede {
 						
 						typecasts.push(
 							if (aliases.length == 1) {
-								macro if (_map.exists( $e { aliases[0] } )) $e { block(aliases[0]) };
+								macro if (_map.exists( $e { aliases[0] } )) {
+									$e { block(aliases[0]) };
+									$e { aliasRemoval(aliases, isFieldOverride) };
+								}
 								
 							} else {
 								macro for (name in [$a { aliases } ]) {
 									if (_map.exists( name )) {
 										$e { block(macro name) };
+										$e { aliasRemoval(aliases, isFieldOverride) };
 										break;
 									}
 								}
@@ -288,8 +398,13 @@ class Ede {
 			}
 			
 		}
-		
+				
 		if (cls.superClass != null) processParents( cls.superClass.t.get() );
+		
+		// This removes fields that have been overriden.
+		for (field in fields) for (i in 0...checks.length) {
+			if (checks[i].name == field.name) checks.remove( checks[i] );
+		}
 		
 		checks = checks.concat( [for (f in fields) 
 				if (!f.access.has( APrivate ) && !f.access.has( AStatic ) && f.name != 'new'  && !hasSkipCmd(f.meta)) 
@@ -386,6 +501,11 @@ class Ede {
 		// Turn all the expressions in `typecasts` into a block of code.
 		var block = macro @:mergeBlock $b { typecasts };
 		
+		if ('debug'.defined() && 'cmd-verbose'.defined()) {
+			nexprs.push( macro trace( 'Input arguments for ' + $v{cls.pack.toDotPath(cls.name)} + ' => ' + args ) );
+			
+		}
+		
 		nexprs.push( macro @:mergeBlock {
 			var _argCopy:Array<String> = args.copy();
 			#if haxelib
@@ -394,6 +514,7 @@ class Ede {
 			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
 			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
 			$block;
+			$e{ (inheritsCommand) ? macro super.edeProcessArgs( _argCopy ) : macro @:mergeBlock {} };
 		} );
 		
 		edeProcessArgsBody.expr = macro $b { nexprs };
@@ -449,5 +570,7 @@ class Ede {
 		
 		return fields;
 	}
+	
+	#end
 	
 }
