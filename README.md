@@ -166,6 +166,7 @@ the field name, uppercased, e.g, `CLASS_FIELD`.
 - You can combine `@alias` and `@:env` on the same field. Aliases take priority over environment variables
 when assigning values.
 - **Currently**, `@:env` only works on properties and not methods.
+- Only available for [system compile targets](https://haxe.org/documentation/introduction/compiler-targets.html).
 
 ##### `@:skip(cmd)`
 
