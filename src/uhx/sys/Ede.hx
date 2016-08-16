@@ -213,7 +213,7 @@ class Ede {
 								
 							}
 							
-						case ':env':
+						case ':env' if (Context.defined('sys')):
 							if (m.params.length > 0) {
 								for (p in m.params) env.push(p);
 							} else {
@@ -280,7 +280,7 @@ class Ede {
 					// `_isFieldSet = $expr` or `@:empty $expr` based on `env.length`.
 					// Might produce better output.
 					var isFieldSet = macro $i{'_isFieldSet'};
-					var envCheck = if (env.length > 0) macro {
+					var envCheck = if (Context.defined('sys') && env.length > 0) macro {
 						for (name in $a{env}) if (_env.exists(name)) {
 							$p{['this', field.name]} = ${coerce(e, t, isFieldSubcommand, field, function() {
 								var ident = aliases.length > 0 ? macro name : macro $v{field.name};
@@ -301,7 +301,7 @@ class Ede {
 											break;
 										}
 									}
-									$e{(env.length > 0) ? (macro if (!$isFieldSet) $envCheck) : (macro @:mergeBlock {})};
+									$e{(Context.defined('sys') && env.length > 0) ? (macro if (!$isFieldSet) $envCheck) : (macro @:mergeBlock {})};
 								} 
 							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { name } ) > -1) {
 								$p{['this', field.name]} = $coerced;
@@ -316,7 +316,7 @@ class Ede {
 											break;
 										}
 									}
-									$e{(env.length > 0) ? macro if (!$isFieldSet) $envCheck : macro @:mergeBlock {}};
+									$e{(Context.defined('sys') && env.length > 0) ? macro if (!$isFieldSet) $envCheck : macro @:mergeBlock {}};
 								}
 							: macro if (_map.exists( $v { name } )) {
 								$p{['this', field.name]} = $coerced;
@@ -530,18 +530,21 @@ class Ede {
 			
 		}
 		
-		var envs = [];
-		for (check in checks) for (meta in check.meta) if (meta.name == ':env') {
-			for (param in meta.params) {
-				var name = KlasImp.printer.printExpr(param).replace('"', '').replace("'", '');
-				var desc = name;
-				envs.push( '\t' + desc + '\t\tSee --${displayName(check.meta, check.name)}' );
-			
+		if(Context.defined('sys')) {
+			var envs = [];
+			for (check in checks) for (meta in check.meta) if (meta.name == ':env') {
+				for (param in meta.params) {
+					var name = KlasImp.printer.printExpr(param).replace('"', '').replace("'", '');
+					var desc = name;
+					envs.push( '\t' + desc + '\t\tSee --${displayName(check.meta, check.name)}' );
+					
+				}
+				
 			}
 			
+			if (envs.length > 0) docs.push( '\n\nEnvironment Variables:\n' + envs.join('\n') );
+			
 		}
-		
-		if (envs.length > 0) docs.push( '\n\nEnvironment Variables:\n' + envs.join('\n') );
 		
 		var expr = Context.defined('sys') ? macro @:mergeBlock { Sys.print( $v { docs.join( '' ) } ); Sys.exit(0); } : macro trace( $v { docs.join( '' ) } );
 		switch (fields.filter( function(f) return f.name == 'help' )[0].kind) {
