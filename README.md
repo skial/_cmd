@@ -34,11 +34,11 @@ package ;
 class Main {
 	
 	// Your name.
-	@alias('n')
+	@alias	// The same as @alias('n')
 	@:isVar public var name(get, default):String;
 	
 	// Your age.
-	@alias('a')
+	@alias('a')	// The same as @alias
 	public var age:Int = 25;
 	
 	private var originalArgs:Array<String>;
@@ -63,11 +63,11 @@ package ;
 class Main {
 	
 	// Your name.
-	@alias('n')
+	@alias	// The same as @alias('n')
 	@:isVar public var name(get, default):String;
 	
 	// Your age.
-	@alias('a')
+	@alias('a')	// The same as @alias
 	public var age:Int = 25;
 	
 	private var originalArgs:Array<String>;
@@ -94,11 +94,11 @@ at the top of your constructor, before all other code. See details for
 ### Auto Help
 
 Ede will use your code comments to populate the auto-generated `help`
-message. The auto-generated `help` method, has the following two
+message. The auto-generated `help` method has the following two
 aliases, `-?` and `-h`. Ede builds the message passed on:
 
  - Your public fields documentation.
- - Your public fields names and their aliases.
+ - Your public fields names, their aliases and environment metadata.
 
 ### Subcommands
 
@@ -106,8 +106,8 @@ A subcommand is just a normal class marked with `@:cmd`.
 
  - Subcommands are dashless in both their long and short forms, _i.e_, they don't start with either `--` or `-`.
  - Ede will only process a subcommand if it's the first argument passed in.
-  + This will work: `mytool sub -a 1 -b 2 -c 3`.
-  + This **won't** work: `mytool -a 1 sub -b 2 -c 3`, _because `Lod`, which parses the arguments_, reads `-a 1 sub` as `-a` having two values, `['1', 'sub']`.
+  + This will work: `cmd sub -a 1 -b 2 -c 3`.
+  + This **won't** work: `cmd -a 1 sub -b 2 -c 3`, _because `Lod` which parses the arguments_, reads `-a 1 sub` as `-a` having two values, `['1', 'sub']`.
  - Ede will pass all arguments to your subcommand to process.
 
 If your subcommand class takes more than one argument, your
@@ -147,11 +147,25 @@ If the `@:usage` string includes the word `haxelib`, Ede will act as if
 
 ##### `@alias`
 
-Add `@alias('v')` to your field to provide an alternative _short form_ name.
+Add `@alias` or `@alias('v')` to your field to provide an alternative _short form_ name.
 
 - Notice it is a runtime metadata, it doesn't contain `:`. Defining `@:alias` will not work.
-- You can define multiple values, e.g, `@alias('a','b', 'c')`.
+- You can define multiple values, e.g, `@alias('a', 'b', 'c')`.
 - The alias can be any length, e.g, `@alias('supercalifragilisticexpialidocious')`
+- Passing no parameters, `@alias`, will result in the first character of the field being used, lowercased.
+- Aliases assigned in super classes will be inherited on overridden methods.
+
+##### `@:env`
+
+Add `@:env` or `@:env('NAME')` to your field to assign a value set in an environment variable.
+
+- You can define multiple names, e.g, `@:env('USERPATH', 'PATH')`, the first match will have its value used.
+- The name can be any case, but uppercase is standard and recommended.
+- Passing no parameters, `@:env`, will assign an auto-generated value based on the class name, plus
+the field name, uppercased, e.g, `CLASS_FIELD`.
+- You can combine `@alias` and `@:env` on the same field. Aliases take priority over environment variables
+when assigning values.
+- **Currently**, `@:env` only works on properties and not methods.
 
 ##### `@:skip(cmd)`
 
@@ -162,6 +176,8 @@ in the auto-generated `help` message.
 
 Add `@:native('value')` to your field to match against `value` instead of the
 variables/methods original name.
+
+- This has no affect on `@:env`.
 
 #### Expression level metadata
 
