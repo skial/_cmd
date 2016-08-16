@@ -194,6 +194,7 @@ class Ede {
 			switch (field.kind) {
 				case FVar(t, e), FProp(_, _, t, e):
 					var name = displayName( field.meta, field.name );
+					var env = [];
 					var aliases = [macro $v { name } ];
 					var isFieldOverride = field.access.indexOf( AOverride ) > -1;
 					var isFieldSubcommand = t.toType().match( TInst(_.get().meta.has( ':cmd' ) => true, _) );
@@ -201,82 +202,119 @@ class Ede {
 					if (cls.superClass != null && isFieldOverride) aliases = aliases.concat( superAliases( cls.superClass.t.get(), field.name ) );
 					if (isFieldSubcommand) field.meta.push( { name:':subcommand', params:[], pos:field.pos } );
 					
-					for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
-						aliases = aliases.concat( m.params );
-						
-					} else  {
-						aliases.push( macro $v{ field.name.charAt(0) } );
-						m.params.push( macro $v{ field.name.charAt(0) } );
-						
-					}
-					
-					var e = if (isFieldSubcommand) {
-						function resolveTPath(t:ComplexType) return switch (t) {
-							case TPath(p): p;
-							case _: null;
+					for (m in field.meta) switch m.name {
+						case 'alias':
+							if (m.params.length > 0) {
+								for (p in m.params) aliases.push(p);
+								
+							} else  {
+								aliases.push( macro $v{ field.name.charAt(0) } );
+								m.params.push( macro $v{ field.name.charAt(0) } );
+								
+							}
 							
-						}
-						var tp = resolveTPath(t);
-						var res = if (e != null) {
-							macro $e(args);
-							
-						} else {
-							macro new $tp(args);
-							
-						}
-						
-						if (e != null) switch (field.kind) {
-							case FVar(t, e): field.kind = FVar(t, null);
-							case FProp(g, s, t, e): field.kind = FProp(g, s, t, null);
-							case _:
-						}
-						
-						res;
-					} else if (aliases.length > 1) {
-						macro (_map.get( name )[0]:String);
-						
-					} else {
-						macro (_map.get( $v { name } )[0]:String);
-						
-					}
-					
-					e = switch (t) {
-						case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
-							macro cast _map.get( name );
-							
-						// Bool values do not require a value, eg `cmd -v` means v is true.
-						case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
-							macro ($e == null) ? true : $ { Jete.coerce(t, e) };
+						case ':env':
+							m.params.length > 0 ? for (p in m.params) env.push(p) : env.push(macro $v{'${cls.name}_${field.name}'.toUpperCase()});
 							
 						case _:
-							macro $ { Jete.coerce(t, e) };
 							
 					}
+					
+					function coerce(expr:Null<Expr>, ct:ComplexType, isSub:Bool, field:Field, access:Void->Expr, values:Array<Expr>):Expr {
+						var result = expr;
+						
+						// First build expression based on `isSub` or `values` length.
+						if (isSub) {
+							var tp = switch ct {
+								case TPath(p): p;
+								case _: null;
+							}
+							if (expr != null) {
+								result = macro $expr(args);
+								
+							} else {
+								result = macro new $tp(args);
+								
+							}
+							
+							if (expr != null) switch (field.kind) {
+								case FVar(t, e): field.kind = FVar(t, null);
+								case FProp(g, s, t, e): field.kind = FProp(g, s, t, null);
+								case _:
+							}
+							
+						} else {
+							result = access();
+							
+						}
+						
+						// Then adapt the expression based on the complex type.
+						switch ct {
+							case TPath( { name:'Array', pack:_, params:_, sub:_ } ):
+								result = macro cast $e{access()};
+								
+							// Bool values do not require a value, eg `cmd -v` means v is true.
+							case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
+								result = macro ($result == null) ? true : $ { Jete.coerce(t, result) };
+								
+							case _:
+								result = macro $ { Jete.coerce(t, result) };
+						}
+						
+						return result;
+					}
+					
+					var coerced = coerce(e, t, isFieldSubcommand, field, function() {
+						var ident = aliases.length > 0 ? macro name : macro $v{field.name};
+						return macro (_map.get($ident)[0]:String);
+					}, aliases);
+					
+					// Used to record if a the field was set.
+					// TODO convert to function, takes a single expr and returns
+					// `_isFieldSet = $expr` or `@:empty $expr` based on `env.length`.
+					// Might produce better output.
+					var isFieldSet = macro $i{'_isFieldSet'};
+					var envCheck = if (env.length > 0) macro {
+						for (name in $a{env}) if (_env.exists(name)) {
+							$p{['this', field.name]} = ${coerce(e, t, isFieldSubcommand, field, function() {
+								var ident = aliases.length > 0 ? macro name : macro $v{field.name};
+								return macro ([_env.get($ident)][0]:String);
+							}, env)};
+							break;
+						}
+						
+					} else macro {};
 					
 					typecasts.push( 
 						if (isFieldSubcommand) {
 							aliases.length > 1 
-							? macro for (name in [$a { aliases } ]) {
-									if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( name ) > -1) { 
-										$p{['this', field.name]} = $e;
-										break;
+							? macro @:mergeBlock {
+									for (name in [$a { aliases } ]) {
+										if ($isFieldSet = (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( name ) > -1)) { 
+											$p{['this', field.name]} = $coerced;
+											break;
+										}
 									}
+									$e{(env.length > 0) ? (macro if (!$isFieldSet) $envCheck) : (macro @:mergeBlock {})};
 								} 
 							: macro if (_map.exists( 'argv' ) && _map.get( 'argv' ).indexOf( $v { name } ) > -1) {
-								$p{['this', field.name]} = $e;
-							}
+								$p{['this', field.name]} = $coerced;
+							} else $envCheck;
 							
 						} else {
 							aliases.length > 1 
-							? macro for (name in [$a { aliases } ]) {
-									if (_map.exists( name )) { 
-										$p{['this', field.name]} = $e;
-										break;
+							? macro @:mergeBlock {
+									for (name in [$a { aliases } ]) {
+										if ($isFieldSet = _map.exists( name )) { 
+											$p{['this', field.name]} = $coerced;
+											break;
+										}
 									}
-								} 
+									$e{(env.length > 0) ? macro if (!$isFieldSet) $envCheck : macro @:mergeBlock {}};
+								}
 							: macro if (_map.exists( $v { name } )) {
-								$p{['this', field.name]} = $e;
-							}
+								$p{['this', field.name]} = $coerced;
+							} else $envCheck;
 							
 						}
 					);
@@ -294,16 +332,26 @@ class Ede {
 						field.meta.push( { name:'arity', pos:field.pos, params:[macro $v { required.length } ] } );
 						if (optional.length > 0) field.meta.push( { name:'optional_arity', pos:field.pos, params:[macro $v { optional.length } ] } );
 						
+						var env = [];
 						var aliases = [macro $v { field.name } ];
 						var isFieldOverride = field.access.indexOf( AOverride ) > -1;
 						
-						for (m in field.meta) if (m.name == 'alias') if(m.params.length > 0) {
-							aliases = aliases.concat( m.params );
-							
-						} else  {
-							aliases.push( macro $v{ field.name.charAt(0) } );
-							m.params.push( macro $v{ field.name.charAt(0) } );
-							
+						for (m in field.meta) switch m.name {
+							case 'alias':
+								if (m.params.length > 0) {
+									for (p in m.params) aliases.push(p);
+									
+								} else  {
+									aliases.push( macro $v{ field.name.charAt(0) } );
+									m.params.push( macro $v{ field.name.charAt(0) } );
+									
+								}
+								
+							case ':env':
+								m.params.length > 0 ? for (p in m.params) env.push(p) : env.push(macro $v{'${cls.name}_${field.name}'.toUpperCase()});
+								
+							case _:
+								
 						}
 						
 						if (cls.superClass != null && isFieldOverride) {
@@ -333,24 +381,20 @@ class Ede {
 							argcasts.push( macro $e { Jete.coerce( required[i].type, macro _args[$v { i } ] ) } );
 						}
 						
-						var block = function(name:Expr) return if (required.length > 0 || optional.length > 0) {
+						function block(name:Expr) return if (required.length > 0 || optional.length > 0) {
 							macro {
 								var _args = _map.get( $name );
 								
-								$e{required.length > 0 ? macro @:mergeBlock {
-									if (_args.length < $v { required.length }) {
-										throw '' + ($name == $v { field.name } ?$v { '--' + field.name } :'-' + $name) + $v { ' expects ' + required.length + ' arg' + (required.length > 1 ? 's' : '') + '.' };
-										
-									}
-								}: macro @:mergeBlock {} }
-								
-								if (_args.length > $v { (required.length + optional.length)-1 } ) {
-									$p { ['this', field.name] } ($a { argcasts.concat( [for (i in 0...optional.length) macro $e { Jete.coerce(optional[i].type, macro _args[$v { required.length + i } ]) } ]) } );
-									
-								} else {
-									$p { ['this', field.name] } ($a { argcasts } );
-									
+								$e{
+									required.length > 0 ? macro @:mergeBlock {
+										if (_args.length < $v { required.length }) {
+											throw '' + ($name == $v { field.name } ?$v { '--' + field.name } :'-' + $name) + $v { ' expects ' + required.length + ' arg' + (required.length > 1 ? 's' : '') + '.' };
+											
+										}
+									}: macro @:mergeBlock {}
 								}
+								$p { ['this', field.name] } ($a { argcasts } );
+								
 							}
 							
 						} else {
@@ -446,10 +490,9 @@ class Ede {
 				var aliases = check.meta.filter( function(m) return m.name == 'alias' );
 				var isSubcommand = check.meta.filter( function(m) return m.name == ':subcommand' ).length > 0;
 				
-				part = (!isSubcommand?'--':'') + '${displayName(check.meta, check.name)}\t$part';
+				part += (!isSubcommand?'--':'') + '${displayName(check.meta, check.name)}\t$part';
 				
-				if (aliases != null) for (alias in aliases) for(param in alias.params) {
-					
+				if (aliases != null) for (alias in aliases) for (param in alias.params) {
 					part = '-' + KlasImp.printer.printExpr( param ).replace('"', '').replace("'", '') + ', $part';
 					
 				}
@@ -481,6 +524,19 @@ class Ede {
 			
 		}
 		
+		var envs = [];
+		for (check in checks) for (meta in check.meta) if (meta.name == ':env') {
+			for (param in meta.params) {
+				var name = KlasImp.printer.printExpr(param).replace('"', '').replace("'", '');
+				var desc = name;
+				envs.push( '\t' + desc + '\t\tSee --${displayName(check.meta, check.name)}' );
+			
+			}
+			
+		}
+		
+		if (envs.length > 0) docs.push( '\n\nEnvironment Variables:\n' + envs.join('\n') );
+		
 		var expr = Context.defined('sys') ? macro @:mergeBlock { Sys.print( $v { docs.join( '' ) } ); Sys.exit(0); } : macro trace( $v { docs.join( '' ) } );
 		switch (fields.filter( function(f) return f.name == 'help' )[0].kind) {
 			case FFun(m): m.expr = macro { $expr; };
@@ -511,7 +567,9 @@ class Ede {
 			#if haxelib
 			$haxelib;
 			#end
+			var _isFieldSet = false;
 			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
+			var _env:haxe.ds.StringMap<String> = Sys.environment();
 			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
 			$block;
 			$e{ (inheritsCommand) ? macro super.edeProcessArgs( _argCopy ) : macro @:mergeBlock {} };
