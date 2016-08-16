@@ -34,11 +34,11 @@ package ;
 class Main {
 	
 	// Your name.
-	@alias
+	@alias	// The same as @alias('n')
 	@:isVar public var name(get, default):String;
 	
 	// Your age.
-	@alias
+	@alias('a')	// The same as @alias
 	public var age:Int = 25;
 	
 	private var originalArgs:Array<String>;
@@ -63,11 +63,11 @@ package ;
 class Main {
 	
 	// Your name.
-	@alias
+	@alias	// The same as @alias('n')
 	@:isVar public var name(get, default):String;
 	
 	// Your age.
-	@alias
+	@alias('a')	// The same as @alias
 	public var age:Int = 25;
 	
 	private var originalArgs:Array<String>;
@@ -153,19 +153,19 @@ Add `@alias` or `@alias('v')` to your field to provide an alternative _short for
 - You can define multiple values, e.g, `@alias('a', 'b', 'c')`.
 - The alias can be any length, e.g, `@alias('supercalifragilisticexpialidocious')`
 - Passing no parameters, `@alias`, will result in the first character of the field being used, lowercased.
-- Aliases assigned in super classes, will be inherited on overridden methods.
+- Aliases assigned in super classes will be inherited on overridden methods.
 
 ##### `@:env`
 
-Add `@:env` or `@:env('VALUE')` to your field to assign a value set in an environment variable.
+Add `@:env` or `@:env('NAME')` to your field to assign a value set in an environment variable.
 
-- You can define multiple values, e.g, `@:env('USERPATH', 'PATH')`.
-- The value can be any case, but capitals are standard and recommended.
+- You can define multiple names, e.g, `@:env('USERPATH', 'PATH')`, the first match will have its value used.
+- The name can be any case, but uppercase is standard and recommended.
 - Passing no parameters, `@:env`, will assign an auto-generated value based on the class name, plus
-the fields name, in capitals, e.g, `CLASS_FIELD`.
+the field name, uppercase, e.g, `CLASS_FIELD`.
 - You can combine `@alias` and `@:env` on the same field. Aliases take priority over environment variables
 when assigning values.
-- **Currently**, `@:env` only works on properties, not methods.
+- **Currently**, `@:env` only works on properties and not methods.
 
 ##### `@:skip(cmd)`
 
