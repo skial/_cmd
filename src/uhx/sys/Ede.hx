@@ -214,7 +214,13 @@ class Ede {
 							}
 							
 						case ':env':
-							m.params.length > 0 ? for (p in m.params) env.push(p) : env.push(macro $v{'${cls.name}_${field.name}'.toUpperCase()});
+							if (m.params.length > 0) {
+								for (p in m.params) env.push(p);
+							} else {
+								env.push(macro $v{'${cls.name}_${field.name}'.toUpperCase()});
+								m.params.push(macro $v{'${cls.name}_${field.name}'.toUpperCase()});
+								
+							} 
 							
 						case _:
 							
