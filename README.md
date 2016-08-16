@@ -162,7 +162,7 @@ Add `@:env` or `@:env('NAME')` to your field to assign a value set in an environ
 - You can define multiple names, e.g, `@:env('USERPATH', 'PATH')`, the first match will have its value used.
 - The name can be any case, but uppercase is standard and recommended.
 - Passing no parameters, `@:env`, will assign an auto-generated value based on the class name, plus
-the field name, uppercase, e.g, `CLASS_FIELD`.
+the field name, uppercased, e.g, `CLASS_FIELD`.
 - You can combine `@alias` and `@:env` on the same field. Aliases take priority over environment variables
 when assigning values.
 - **Currently**, `@:env` only works on properties and not methods.
