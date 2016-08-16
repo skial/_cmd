@@ -381,24 +381,20 @@ class Ede {
 							argcasts.push( macro $e { Jete.coerce( required[i].type, macro _args[$v { i } ] ) } );
 						}
 						
-						var block = function(name:Expr) return if (required.length > 0 || optional.length > 0) {
+						function block(name:Expr) return if (required.length > 0 || optional.length > 0) {
 							macro {
 								var _args = _map.get( $name );
 								
-								$e{required.length > 0 ? macro @:mergeBlock {
-									if (_args.length < $v { required.length }) {
-										throw '' + ($name == $v { field.name } ?$v { '--' + field.name } :'-' + $name) + $v { ' expects ' + required.length + ' arg' + (required.length > 1 ? 's' : '') + '.' };
-										
-									}
-								}: macro @:mergeBlock {} }
-								
-								if (_args.length > $v { (required.length + optional.length)-1 } ) {
-									$p { ['this', field.name] } ($a { argcasts.concat( [for (i in 0...optional.length) macro $e { Jete.coerce(optional[i].type, macro _args[$v { required.length + i } ]) } ]) } );
-									
-								} else {
-									$p { ['this', field.name] } ($a { argcasts } );
-									
+								$e{
+									required.length > 0 ? macro @:mergeBlock {
+										if (_args.length < $v { required.length }) {
+											throw '' + ($name == $v { field.name } ?$v { '--' + field.name } :'-' + $name) + $v { ' expects ' + required.length + ' arg' + (required.length > 1 ? 's' : '') + '.' };
+											
+										}
+									}: macro @:mergeBlock {}
 								}
+								$p { ['this', field.name] } ($a { argcasts } );
+								
 							}
 							
 						} else {
@@ -406,18 +402,16 @@ class Ede {
 							
 						}
 						
-						var isFieldSet = macro $i{'_isFieldSet'};
-						
 						typecasts.push(
 							if (aliases.length == 1) {
-								macro if ($isFieldSet = _map.exists( $e { aliases[0] } )) {
+								macro if (_map.exists( $e { aliases[0] } )) {
 									$e { block(aliases[0]) };
 									$e { aliasRemoval(aliases, isFieldOverride) };
 								}
 								
 							} else {
 								macro for (name in [$a { aliases } ]) {
-									if ($isFieldSet = _map.exists( name )) {
+									if (_map.exists( name )) {
 										$e { block(macro name) };
 										$e { aliasRemoval(aliases, isFieldOverride) };
 										break;
