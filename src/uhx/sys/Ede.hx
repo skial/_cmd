@@ -261,18 +261,27 @@ class Ede {
 								
 							// Bool values do not require a value, eg `cmd -v` means v is true.
 							case TPath( { name:'Bool', pack:_, params:_, sub:_ } ):
-								result = macro ($result == null) ? true : $ { Jete.coerce(t, result) };
+								result = macro ($result.length == 0) ? true : $e{ Jete.coerce(t, macro ($result[0]:String)) };
 								
 							case _:
-								result = macro $ { Jete.coerce(t, result) };
+								switch result {
+									case macro $call(args):
+										// Do nothing as this should be a transformed expression template.
+										
+									case _:
+										// A single value to be returned.
+										result = macro ($e{ Jete.coerce(t, result) }[0]:String);
+										
+								}
+								
 						}
 						
 						return result;
 					}
 					
 					var coerced = coerce(e, t, isFieldSubcommand, field, function() {
-						var ident = aliases.length > 0 ? macro name : macro $v{field.name};
-						return macro (_map.get($ident)[0]:String);
+						var ident = aliases.length > 1 ? macro name : macro $v{name};
+						return macro _map.get($ident);
 					}, aliases);
 					
 					// Used to record if a the field was set.
@@ -284,7 +293,7 @@ class Ede {
 						for (name in $a{env}) if (_env.exists(name)) {
 							$p{['this', field.name]} = ${coerce(e, t, isFieldSubcommand, field, function() {
 								var ident = aliases.length > 0 ? macro name : macro $v{field.name};
-								return macro ([_env.get($ident)][0]:String);
+								return macro [_env.get($ident)];
 							}, env)};
 							break;
 						}
@@ -381,10 +390,15 @@ class Ede {
 							
 						}
 						
-						var argcasts:Array<Expr> = [];
+						var requiredArgcasts:Array<Expr> = [];
+						var optionalArgcasts:Array<Expr> = [];
 						
 						for (i in 0...required.length) {
-							argcasts.push( macro $e { Jete.coerce( required[i].type, macro _args[$v { i } ] ) } );
+							requiredArgcasts.push( macro $e { Jete.coerce( required[i].type, macro _args[$v { i } ] ) } );
+						}
+						
+						for (i in 0...optional.length) {
+							optionalArgcasts.push( macro (_args[$v{ required.length + i}] != null) ? $e{ Jete.coerce( optional[i].type, macro _args[$v{ required.length + i }]) } : null);
 						}
 						
 						function block(name:Expr) return if (required.length > 0 || optional.length > 0) {
@@ -399,7 +413,7 @@ class Ede {
 										}
 									}: macro @:mergeBlock {}
 								}
-								$p { ['this', field.name] } ($a { argcasts } );
+								$p { ['this', field.name] } ($a { requiredArgcasts.concat( optionalArgcasts ) } );
 								
 							}
 							
@@ -580,6 +594,10 @@ class Ede {
 			var _cmd:uhx.sys.Lod = new uhx.sys.Lod( _argCopy );
 			var _env:haxe.ds.StringMap<String> = Sys.environment();
 			var _map:haxe.ds.StringMap<Array<Dynamic>> = _cmd.parse();
+			#if (debug && cmd_verbose)
+			trace( _cmd );
+			trace( _map );
+			#end
 			$block;
 			$e{ (inheritsCommand) ? macro super.edeProcessArgs( _argCopy ) : macro @:mergeBlock {} };
 		} );
